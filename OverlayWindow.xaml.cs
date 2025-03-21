@@ -306,10 +306,6 @@ namespace PlayniteGameOverlay
                     Debug.WriteLine("Closing game: " + runningGame.Name + " PID: " + proc.Id);
                     proc.CloseMainWindow();
                     proc.Close();
-                    // Remove all indicators of games being active
-                    ActiveGame = null;
-                    GameStarted = null;
-                    Pid = null;
                 }
                 // Hide the overlay
                 this.Hide();
