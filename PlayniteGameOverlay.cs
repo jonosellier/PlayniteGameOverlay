@@ -46,7 +46,7 @@ namespace PlayniteGameOverlay
         {
             if (altPressed && key == Keys.Oem3) // Alt + ` (backtick)
             {
-                if(overlayWindow.activeGame != null)
+                if(overlayWindow.ActiveGame != null)
                 {
                     if (overlayWindow.IsVisible)
                         overlayWindow.Hide();
@@ -66,14 +66,14 @@ namespace PlayniteGameOverlay
 
         public override void OnGameStarted(OnGameStartedEventArgs args)
         {
-            overlayWindow.activeGame = args.Game;
+            overlayWindow.ActiveGame = args.Game;
             overlayWindow.Pid = args.StartedProcessId;
-            overlayWindow.gameStarted = DateTime.Now;
+            overlayWindow.GameStarted = DateTime.Now;
         }
 
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
-            overlayWindow.activeGame = null;
+            overlayWindow.ActiveGame = null;
             overlayWindow.Pid = null;
         }
 

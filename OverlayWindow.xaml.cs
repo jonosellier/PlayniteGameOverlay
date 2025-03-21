@@ -22,8 +22,8 @@ namespace PlayniteGameOverlay
         private readonly int BAR_TOP = 29;
         public int barWidth = 0;
 
-        public Game activeGame;
-        public DateTime gameStarted;
+        public Game ActiveGame;
+        public Nullable<DateTime> GameStarted;
         public Nullable<int> Pid;
         private static readonly ILogger logger = LogManager.GetLogger();
 
@@ -89,7 +89,7 @@ namespace PlayniteGameOverlay
 
         private void UpdateGameInfo()
         {
-            var runningGame = activeGame ?? playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+            var runningGame = ActiveGame ?? playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
 
             if (runningGame != null)
             {
@@ -125,7 +125,7 @@ namespace PlayniteGameOverlay
             }
             else
             {
-                activeGame = null;
+                ActiveGame = null;
             }
         }
 
@@ -149,7 +149,7 @@ namespace PlayniteGameOverlay
         private void CloseGameButton_Click(object sender, RoutedEventArgs e)
         {
             // Get the currently running game
-            var runningGame = activeGame ?? playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+            var runningGame = ActiveGame ?? playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
 
             if (runningGame != null)
             {
@@ -162,6 +162,10 @@ namespace PlayniteGameOverlay
                     logger.Info("Closing game: " + runningGame.Name + " PID: " + proc.Id);
                     proc.CloseMainWindow();
                     proc.Close();
+                    // Remove all indicators of games being active
+                    ActiveGame = null;
+                    GameStarted = null;
+                    Pid = null;
                 }
                 // Hide the overlay
                 this.Hide();
@@ -212,7 +216,7 @@ namespace PlayniteGameOverlay
         private Process FindRunningGameProcess()
         {
             // First, check if there's a game running according to Playnite
-            var runningGame = activeGame ?? playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+            var runningGame = ActiveGame ?? playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
 
             if (runningGame == null)
             {
@@ -234,7 +238,7 @@ namespace PlayniteGameOverlay
 
                 // Option 2: Look for likely candidates based on timing
                 // Get processes that started after the game was launched
-                DateTime gameStartTime = gameStarted;
+                DateTime gameStartTime = GameStarted.Value;
 
                 // In some Playnite versions, you might be able to get the actual start time
                 if (runningGame.LastActivity.HasValue)
