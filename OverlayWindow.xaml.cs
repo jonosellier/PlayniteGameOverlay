@@ -2,7 +2,9 @@ using Playnite.SDK;
 using Playnite.SDK.Models;
 using SharpDX.XInput;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -34,6 +36,8 @@ namespace PlayniteGameOverlay
         public Nullable<DateTime> GameStarted;
         public Nullable<int> Pid;
         private static readonly ILogger logger = LogManager.GetLogger();
+
+        private Process gameProcess;
 
 
 
@@ -178,13 +182,13 @@ namespace PlayniteGameOverlay
         private void X_Button_Pressed()
         {
             // Custom X button functionality
-            logger.Info("X button pressed");
+            Debug.WriteLine("X button pressed");
         }
 
         private void Y_Button_Pressed()
         {
             // Custom Y button functionality
-            logger.Info("Y button pressed");
+            Debug.WriteLine("Y button pressed");
         }
 
         private void UpdateBattery()
@@ -200,7 +204,9 @@ namespace PlayniteGameOverlay
         public void ShowOverlay()
         {
             UpdateGameInfo();
+            UpdateDebugInfo();
             this.Show();
+
 
             // Set focus to first button when showing overlay
             ReturnToGameButton.Focus();
@@ -209,6 +215,20 @@ namespace PlayniteGameOverlay
         private void OnGameUpdated(object sender, ItemUpdatedEventArgs<Game> e)
         {
             UpdateGameInfo();
+        }
+
+
+        public void UpdateDebugInfo()
+        {
+            ProcessInfo_DEBUG.Text = "DEBUG INFO:\nGame: "+ActiveGame.Name+"\nPID from Playnite: "+Pid+"\nGame Start Time: "+GameStarted;
+
+            gameProcess = FindRunningGameProcess();
+
+            if (gameProcess != null)
+            {
+                ProcessInfo_DEBUG.Text += "PROCESS INFO:\nName: " + gameProcess.ProcessName +
+                         "\nPID: " + gameProcess.Id;
+            }
         }
 
         private void UpdateGameInfo()
@@ -280,10 +300,10 @@ namespace PlayniteGameOverlay
                 //var gamePath = runningGame.GameActions.Where(a => a.Type == GameActionType.File).FirstOrDefault();
                 //var emulatorPath = runningGame.GameActions.Where(a => a.Type == GameActionType.Emulator).FirstOrDefault();
                 var proc = FindRunningGameProcess();
-                logger.Info("Trying to close " + runningGame.Name);
+                Debug.WriteLine("Trying to close " + runningGame.Name);
                 if (proc != null)
                 {
-                    logger.Info("Closing game: " + runningGame.Name + " PID: " + proc.Id);
+                    Debug.WriteLine("Closing game: " + runningGame.Name + " PID: " + proc.Id);
                     proc.CloseMainWindow();
                     proc.Close();
                     // Remove all indicators of games being active
@@ -349,62 +369,159 @@ namespace PlayniteGameOverlay
 
             try
             {
+                // Get all executable files in the game installation directory and subdirectories
+                var gameExecutables = new List<string>();
+                try
+                {
+                    gameExecutables = Directory.GetFiles(runningGame.InstallDirectory, "*.exe", SearchOption.AllDirectories)
+                        .Select(path => Path.GetFileNameWithoutExtension(path))
+                        .ToList();
+
+                    // Add common variations
+                    var additionalNames = new List<string>();
+                    foreach (var exe in gameExecutables)
+                    {
+                        // Add variations like "game-win64", "game_launcher", etc.
+                        additionalNames.Add(exe.Replace("-", ""));
+                        additionalNames.Add(exe.Replace("_", ""));
+                        additionalNames.Add(exe.Replace(" ", ""));
+                    }
+                    gameExecutables.AddRange(additionalNames);
+
+                    Debug.WriteLine($"Found {gameExecutables.Count} potential game executables in {runningGame.InstallDirectory}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error scanning game directory: {ex.Message}");
+                }
 
                 // Option 1: If Playnite was able to get the process ID, use it
                 if (Pid != null)
                 {
-                    var p = Process.GetProcessById(Pid.Value);
-                    if (p != null && p.MainModule.FileName.IndexOf(runningGame.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0) // Process is in the game's install directory
+                    try
                     {
-                        return p;
+                        var p = Process.GetProcessById(Pid.Value);
+                        if (p != null && !p.HasExited)
+                        {
+                            // Try to access MainModule
+                            try
+                            {
+                                var modulePath = p.MainModule.FileName;
+                                if (modulePath.IndexOf(runningGame.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    return p;
+                                }
+                            }
+                            catch
+                            {
+                                // Check if process name matches any executable in the game folder
+                                if (gameExecutables.Any(exe => string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    Debug.WriteLine($"Process {p.ProcessName} matches a game executable filename");
+                                    return p;
+                                }
+
+                                // Return it anyway since it matches the expected PID
+                                Debug.WriteLine($"Using process by ID {p.Id} but couldn't verify path");
+                                return p;
+                            }
+                        }
                     }
+                    catch { /* Process might not exist anymore */ }
                 }
 
                 // Option 2: Look for likely candidates based on timing
-                // Get processes that started after the game was launched
                 DateTime gameStartTime = GameStarted.Value;
+                Process[] allProcesses = Process.GetProcesses();
 
-                // In some Playnite versions, you might be able to get the actual start time
-                if (runningGame.LastActivity.HasValue)
+                var candidates = new List<Process>();
+                var nameMatchCandidates = new List<Process>();
+                var inaccessibleCandidates = new List<Process>();
+
+                foreach (var p in allProcesses)
                 {
-                    gameStartTime = runningGame.LastActivity.Value;
+                    try
+                    {
+                        // Check start time and memory usage first
+                        if (!p.HasExited &&
+                            p.StartTime < gameStartTime.AddMinutes(2) &&
+                            p.StartTime > gameStartTime.AddMinutes(-3) &&
+                            p.WorkingSet64 > 100 * 1024 * 1024)
+                        {
+                            // Check if process name matches any executable in the game folder
+                            bool nameMatches = gameExecutables.Any(exe =>
+                                string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase));
+                             
+                            try
+                            {
+                                // Try to access the module info
+                                var modulePath = p.MainModule.FileName;
+                                if (modulePath.IndexOf(runningGame.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    candidates.Add(p);
+                                }
+                                else if (nameMatches)
+                                {
+                                    // Path doesn't match but name does - this is a good candidate
+                                    nameMatchCandidates.Add(p);
+                                }
+                            }
+                            catch
+                            {
+                                // Can't access module info (likely due to 32/64 bit mismatch)
+                                if (nameMatches)
+                                {
+                                    // Process name matches executable - higher priority
+                                    nameMatchCandidates.Add(p);
+                                }
+                                else
+                                {
+                                    // No name match, but timing and memory usage match
+                                    inaccessibleCandidates.Add(p);
+                                }
+                            }
+                        }
+                    }
+                    catch { /* Skip processes we can't access at all */ }
                 }
 
-                // Find processes that started around when the game launched
-                // Focus on processes using significant resources
-                Process[] allProcesses = Process.GetProcesses();
-                var candidates = allProcesses
-                    .Where(p => {
-                        try
-                        {
-                            return p.StartTime < gameStartTime.AddMinutes(2) && // 5 min window around game start time
-                                   p.StartTime > gameStartTime.AddMinutes(-3) &&
-                                   p.MainModule.FileName.IndexOf(runningGame.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0 && // Process is in the game's install directory
-                                   (p.WorkingSet64 > 100 * 1024 * 1024); // Over 100MB memory usage
-                        }
-                        catch { return false; } // Skip processes we can't access
-                    })
-                    .OrderByDescending(p => p.WorkingSet64) // Order by memory usage
-                    .ToList();
-
+                // Priority order: direct path match, process name match, then best guess
                 if (candidates.Count > 0)
                 {
-                    return candidates[0]; // Return the most likely candidate
+                    var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
+                    Debug.WriteLine($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    return bestMatch;
+                }
+
+                if (nameMatchCandidates.Count > 0)
+                {
+                    var bestMatch = nameMatchCandidates.OrderByDescending(p => p.WorkingSet64).First();
+                    Debug.WriteLine($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    return bestMatch;
+                }
+
+                if (inaccessibleCandidates.Count > 0)
+                {
+                    var bestGuess = inaccessibleCandidates.OrderByDescending(p => p.WorkingSet64).First();
+                    Debug.WriteLine($"Using best guess process: {bestGuess.ProcessName} (ID: {bestGuess.Id})");
+                    return bestGuess;
                 }
             }
             catch (Exception ex)
             {
                 // Log error
-                logger.Info($"Error finding game process: {ex.Message}");
+                Debug.WriteLine($"Error finding game process: {ex.Message}");
             }
 
             return null;
         }
+        // Helper method to safely check process path against directory
 
         private void UpdateClock(object sender, EventArgs e)
         {
             Clock.Text = DateTime.Now.ToString("HH:mm");
         }
 
-    } 
+
+    }
 }

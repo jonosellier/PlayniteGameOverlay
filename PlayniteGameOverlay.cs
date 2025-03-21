@@ -69,6 +69,7 @@ namespace PlayniteGameOverlay
             overlayWindow.ActiveGame = args.Game;
             overlayWindow.Pid = args.StartedProcessId;
             overlayWindow.GameStarted = DateTime.Now;
+            overlayWindow.UpdateDebugInfo();
         }
 
         public override void OnGameStopped(OnGameStoppedEventArgs args)
