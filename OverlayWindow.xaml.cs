@@ -1,11 +1,13 @@
 using Playnite.SDK;
 using Playnite.SDK.Models;
+using SharpDX.XInput;
 using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Forms;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -16,6 +18,12 @@ namespace PlayniteGameOverlay
         private readonly IPlayniteAPI playniteAPI;
         private readonly DispatcherTimer clockTimer;
         private readonly DispatcherTimer batteryUpdateTimer;
+        private readonly DispatcherTimer controllerTimer;
+
+        private readonly Controller controller;
+        private Gamepad previousState;
+        private bool isLeftStickInNeutralPosition = true;
+        private bool isDPadInNeutralPosition = true;
 
         private readonly int MAX_BAR_WIDTH = 53;
         private readonly int BAR_RIGHT = 158;
@@ -52,7 +60,7 @@ namespace PlayniteGameOverlay
             clockTimer.Start();
 
 
-            if(SystemInformation.PowerStatus.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
+            if (SystemInformation.PowerStatus.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
             {
                 Battery.Visibility = Visibility.Collapsed;
             }
@@ -64,6 +72,119 @@ namespace PlayniteGameOverlay
                 batteryUpdateTimer.Tick += (sender, e) => UpdateBattery();
                 batteryUpdateTimer.Start();
             }
+
+            // Initialize XInput controller
+            controller = new Controller(UserIndex.One);
+
+            // Setup controller polling timer
+            controllerTimer = new DispatcherTimer();
+            controllerTimer.Interval = TimeSpan.FromMilliseconds(50); // 50ms polling rate
+            controllerTimer.Tick += CheckControllerInput;
+            controllerTimer.Start();
+
+            // Set initial focus to first button
+            ReturnToGameButton.Focus();
+        }
+
+        private void CheckControllerInput(object sender, EventArgs e)
+        {
+            if (!controller.IsConnected)
+                return;
+
+            var gamepadState = controller.GetState().Gamepad;
+
+            // Handle button presses
+            if (IsNewButtonPress(gamepadState.Buttons, previousState.Buttons, GamepadButtonFlags.A))
+            {
+                // Simulate a click on the focused button
+                if (FocusManager.GetFocusedElement(this) is System.Windows.Controls.Button focusedButton)
+                {
+                    focusedButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                }
+            }
+
+            if (IsNewButtonPress(gamepadState.Buttons, previousState.Buttons, GamepadButtonFlags.B))
+            {
+                B_Button_Pressed();
+            }
+
+            if (IsNewButtonPress(gamepadState.Buttons, previousState.Buttons, GamepadButtonFlags.X))
+            {
+                X_Button_Pressed();
+            }
+
+            if (IsNewButtonPress(gamepadState.Buttons, previousState.Buttons, GamepadButtonFlags.Y))
+            {
+                Y_Button_Pressed();
+            }
+
+            // Handle D-pad navigation
+            if (isLeftStickInNeutralPosition && isDPadInNeutralPosition)
+            {
+                // Move focus up
+                if (gamepadState.LeftThumbY > 8000 || (gamepadState.Buttons & GamepadButtonFlags.DPadUp) != 0)
+                {
+                    MoveFocus(FocusNavigationDirection.Up);
+                    isLeftStickInNeutralPosition = false;
+                    isDPadInNeutralPosition = false;
+                }
+                // Move focus down
+                else if (gamepadState.LeftThumbY < -8000 || (gamepadState.Buttons & GamepadButtonFlags.DPadDown) != 0)
+                {
+                    MoveFocus(FocusNavigationDirection.Down);
+                    isLeftStickInNeutralPosition = false;
+                    isDPadInNeutralPosition = false;
+                }
+            }
+
+            // Reset stick/d-pad neutral flags when input returns to neutral position
+            if (Math.Abs(gamepadState.LeftThumbY) < 5000)
+            {
+                isLeftStickInNeutralPosition = true;
+            }
+
+            if ((gamepadState.Buttons & (GamepadButtonFlags.DPadUp | GamepadButtonFlags.DPadDown)) == 0)
+            {
+                isDPadInNeutralPosition = true;
+            }
+
+            // Save current state for next comparison
+            previousState = gamepadState;
+        }
+
+        private bool IsNewButtonPress(GamepadButtonFlags currentButtons, GamepadButtonFlags previousButtons, GamepadButtonFlags button)
+        {
+            bool isCurrentlyPressed = (currentButtons & button) != 0;
+            bool wasPreviouslyPressed = (previousButtons & button) != 0;
+
+            return isCurrentlyPressed && !wasPreviouslyPressed;
+        }
+
+        private void MoveFocus(FocusNavigationDirection direction)
+        {
+            if (FocusManager.GetFocusedElement(this) is UIElement focusedElement)
+            {
+                focusedElement.MoveFocus(new TraversalRequest(direction));
+            }
+        }
+
+        // Controller button handlers
+        private void B_Button_Pressed()
+        {
+            // By default, B acts like an "Exit/Cancel" button
+            this.Hide();
+        }
+
+        private void X_Button_Pressed()
+        {
+            // Custom X button functionality
+            logger.Info("X button pressed");
+        }
+
+        private void Y_Button_Pressed()
+        {
+            // Custom Y button functionality
+            logger.Info("Y button pressed");
         }
 
         private void UpdateBattery()
@@ -80,6 +201,9 @@ namespace PlayniteGameOverlay
         {
             UpdateGameInfo();
             this.Show();
+
+            // Set focus to first button when showing overlay
+            ReturnToGameButton.Focus();
         }
 
         private void OnGameUpdated(object sender, ItemUpdatedEventArgs<Game> e)
