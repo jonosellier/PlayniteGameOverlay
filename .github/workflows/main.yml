@@ -1,4 +1,4 @@
-Copyname: Publish Release Artifact
+name: Publish Release Artifact
 
 on:
   release:
