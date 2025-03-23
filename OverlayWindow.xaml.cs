@@ -400,40 +400,37 @@ namespace PlayniteGameOverlay
 
                 Debug.WriteLine($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
 
-                // Option 1: If Playnite was able to get the process ID, use it
-                //if (Pid != null)
-                //{
-                //    try
-                //    {
-                //        var p = Process.GetProcessById(Pid.Value);
-                //        if (p != null && !p.HasExited)
-                //        {
-                //            // Try to access MainModule
-                //            try
-                //            {
-                //                var modulePath = p.MainModule.FileName;
-                //                if (modulePath.IndexOf(runningGame.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0)
-                //                {
-                //                    return p;
-                //                }
-                //            }
-                //            catch
-                //            {
-                //                // Check if process name matches any executable in the game folder
-                //                if (gameExecutables.Any(exe => string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase)))
-                //                {
-                //                    Debug.WriteLine($"Process {p.ProcessName} matches a game executable filename");
-                //                    return p;
-                //                }
-
-                //                // Return it anyway since it matches the expected PID
-                //                Debug.WriteLine($"Using process by ID {p.Id} but couldn't verify path");
-                //                return p;
-                //            }
-                //        }
-                //    }
-                //    catch { /* Process might not exist anymore */ }
-                //}
+                //Option 1: If Playnite was able to get the process ID, use it
+                if (Pid != null)
+                {
+                    try
+                    {
+                        var p = Process.GetProcessById(Pid.Value);
+                        if (p != null && !p.HasExited)
+                        {
+                            // Try to access MainModule
+                            try
+                            {
+                                var modulePath = p.MainModule.FileName;
+                                if (modulePath.IndexOf(runningGame.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0 && p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
+                                {
+                                    Debug.WriteLine($"Process {p.ProcessName} matches launch executable file path and has a window title");
+                                    return p;
+                                }
+                            }
+                            catch
+                            {
+                                // Check if process name matches any executable in the game folder
+                                if (gameExecutables.Any(exe => string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase)) && p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
+                                {
+                                    Debug.WriteLine($"Process {p.ProcessName} matches a game executable filename and has a window title");
+                                    return p;
+                                }
+                            }
+                        }
+                    }
+                    catch { /* Process might not exist anymore */ }
+                }
 
                 // Option 2: Look for likely candidates based on timing
                 DateTime gameStartTime = GameStarted.Value;
