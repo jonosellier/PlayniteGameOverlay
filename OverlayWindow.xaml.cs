@@ -28,7 +28,7 @@ namespace PlayniteGameOverlay
         private bool isDPadInNeutralPosition = true;
 
         private readonly int MAX_BAR_WIDTH = 53;
-        private readonly int BAR_RIGHT = 158;
+        private readonly int BAR_RIGHT = 170;
         private readonly int BAR_TOP = 29;
         public int barWidth = 0;
 
@@ -71,6 +71,7 @@ namespace PlayniteGameOverlay
             else
             {
                 Battery.Visibility = Visibility.Visible;
+                UpdateBattery();
                 batteryUpdateTimer = new DispatcherTimer();
                 batteryUpdateTimer.Interval = TimeSpan.FromSeconds(60);
                 batteryUpdateTimer.Tick += (sender, e) => UpdateBattery();
