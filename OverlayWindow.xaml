@@ -140,7 +140,7 @@
 
             <!-- Content container -->
             <TextBlock x:Name="GameTitle" Foreground="White" FontWeight="Bold" HorizontalAlignment="Left" 
-                           Margin="36,14,0,0" Height="56" VerticalAlignment="Top" FontSize="36" Width="1309"><Run Text="Game Name Here"/><LineBreak/><Run/></TextBlock>
+                           Margin="36,4,0,0" Height="56" VerticalAlignment="Top" FontSize="36" Width="1309"><Run Text="Game Name Here"/><LineBreak/><Run/></TextBlock>
             <TextBlock x:Name="Playtime" TextWrapping="Wrap" Foreground="#FFD0D0D0" FontSize="24" FontWeight="Bold" Margin="0,676,38,0" HorizontalAlignment="Right" VerticalAlignment="Top" Width="375" Height="46" TextAlignment="Right"><Run Text="123 hours"/><LineBreak/><Run/></TextBlock>
             <Border BorderBrush="#80808080" BorderThickness="4,4,4,4" Width="383" Height="534" Margin="0,120,36,0" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="11,11,11,11" Background="#80808080">
 
@@ -154,13 +154,13 @@
             </Border>
             <!-- Clock -->
             <TextBlock x:Name="Clock" Foreground="White" FontWeight="Bold" HorizontalAlignment="Right" 
-                   Margin="0,14,36,0" VerticalAlignment="Top" FontSize="36" Text="12:34" Width="100" TextAlignment="Right" />
+                   Margin="0,14,36,0" VerticalAlignment="Top" FontSize="24" Text="12:34" Width="100" TextAlignment="Right" />
 
             <Grid x:Name="Battery">
-                <Rectangle x:Name="BatteryBar"  HorizontalAlignment="Right" Height="24" Margin="0,29,170,0" Fill="#FF48AF30" VerticalAlignment="Top" Width="53"/>
-                <Rectangle HorizontalAlignment="Right" Height="17" Margin="0,32,159,0" Fill="White" VerticalAlignment="Top" Width="10"/>
-                <Rectangle Stroke="White" Margin="0,25,166,0" StrokeThickness="4" Width="61" HorizontalAlignment="Right" VerticalAlignment="Top" Height="32"/>
-                <TextBlock x:Name="BatteryText" HorizontalAlignment="Left" Margin="1377,30,0,0" TextWrapping="Wrap" Text="100%" VerticalAlignment="Top" FontWeight="Bold" FontSize="16" Foreground="White" Width="53" TextAlignment="Center" Height="22"/>
+                <Rectangle x:Name="BatteryBar"  HorizontalAlignment="Right" Height="17" Margin="0,23,127,0" Fill="#FF48AF30" VerticalAlignment="Top" Width="37"/>
+                <Rectangle HorizontalAlignment="Right" Height="17" Margin="0,23,121,0" Fill="White" VerticalAlignment="Top" Width="5"/>
+                <Rectangle Stroke="White" Margin="0,19,124,0" StrokeThickness="4" Width="43" HorizontalAlignment="Right" VerticalAlignment="Top" Height="25"/>
+                <TextBlock x:Name="BatteryText" HorizontalAlignment="Left" Margin="1436,23,0,0" TextWrapping="Wrap" Text="100%" VerticalAlignment="Top" FontWeight="Bold" Foreground="White" Width="37" TextAlignment="Center" Height="16"/>
             </Grid>
             <TextBlock x:Name="ProcessInfo_DEBUG" HorizontalAlignment="Left" Margin="41,446,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Height="266" Width="296" Foreground="White"><Run Text="Debug info goes here"/><LineBreak/><Run/></TextBlock>
         </Grid>
