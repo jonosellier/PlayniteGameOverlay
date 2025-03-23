@@ -227,7 +227,7 @@ namespace PlayniteGameOverlay
 
             if (gameProcess != null)
             {
-                ProcessInfo_DEBUG.Text += "PROCESS INFO:\nName: " + gameProcess.ProcessName +
+                ProcessInfo_DEBUG.Text += "\nPROCESS INFO:\nName: " + gameProcess.ProcessName +
                          "\nPID: " + gameProcess.Id;
             }
         }
@@ -278,15 +278,16 @@ namespace PlayniteGameOverlay
         private void ReturnToGameButton_Click(object sender, RoutedEventArgs e)
         {
             var proc = FindRunningGameProcess();
+
             if (proc != null)
             {
-                // Bring the game window to the front
-                SetForegroundWindow(proc.MainWindowHandle);
                 // Restore the window if it's minimized
                 if (IsIconic(proc.MainWindowHandle))
                 {
                     ShowWindow(proc.MainWindowHandle, SW_RESTORE);
                 }
+                // Bring the game window to the front
+                SetForegroundWindow(proc.MainWindowHandle);
             }
             this.Hide();
         }
@@ -392,47 +393,66 @@ namespace PlayniteGameOverlay
                     Debug.WriteLine($"Error scanning game directory: {ex.Message}");
                 }
 
-                // Option 1: If Playnite was able to get the process ID, use it
-                if (Pid != null)
-                {
-                    try
-                    {
-                        var p = Process.GetProcessById(Pid.Value);
-                        if (p != null && !p.HasExited)
-                        {
-                            // Try to access MainModule
-                            try
-                            {
-                                var modulePath = p.MainModule.FileName;
-                                if (modulePath.IndexOf(runningGame.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0)
-                                {
-                                    return p;
-                                }
-                            }
-                            catch
-                            {
-                                // Check if process name matches any executable in the game folder
-                                if (gameExecutables.Any(exe => string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    Debug.WriteLine($"Process {p.ProcessName} matches a game executable filename");
-                                    return p;
-                                }
+                // Get the game name words for title comparison
+                string gameName = runningGame.Name;
+                string[] gameNameWords = gameName.ToLower().Split(new char[] { ' ', '-', '_', ':', '.', '(', ')', '[', ']' },
+                    StringSplitOptions.RemoveEmptyEntries);
 
-                                // Return it anyway since it matches the expected PID
-                                Debug.WriteLine($"Using process by ID {p.Id} but couldn't verify path");
-                                return p;
-                            }
-                        }
-                    }
-                    catch { /* Process might not exist anymore */ }
-                }
+                Debug.WriteLine($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
+
+                // Option 1: If Playnite was able to get the process ID, use it
+                //if (Pid != null)
+                //{
+                //    try
+                //    {
+                //        var p = Process.GetProcessById(Pid.Value);
+                //        if (p != null && !p.HasExited)
+                //        {
+                //            // Try to access MainModule
+                //            try
+                //            {
+                //                var modulePath = p.MainModule.FileName;
+                //                if (modulePath.IndexOf(runningGame.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0)
+                //                {
+                //                    return p;
+                //                }
+                //            }
+                //            catch
+                //            {
+                //                // Check if process name matches any executable in the game folder
+                //                if (gameExecutables.Any(exe => string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase)))
+                //                {
+                //                    Debug.WriteLine($"Process {p.ProcessName} matches a game executable filename");
+                //                    return p;
+                //                }
+
+                //                // Return it anyway since it matches the expected PID
+                //                Debug.WriteLine($"Using process by ID {p.Id} but couldn't verify path");
+                //                return p;
+                //            }
+                //        }
+                //    }
+                //    catch { /* Process might not exist anymore */ }
+                //}
 
                 // Option 2: Look for likely candidates based on timing
                 DateTime gameStartTime = GameStarted.Value;
-                Process[] allProcesses = Process.GetProcesses();
+                Process[] allProcesses = Process.GetProcesses()
+                    .Where(p => {
+                        try
+                        {
+                            return p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle);
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    })
+                    .ToArray();
 
                 var candidates = new List<Process>();
                 var nameMatchCandidates = new List<Process>();
+                var titleMatchCandidates = new List<(Process Process, int MatchCount)>(); // Add title match candidates
                 var inaccessibleCandidates = new List<Process>();
 
                 foreach (var p in allProcesses)
@@ -448,7 +468,24 @@ namespace PlayniteGameOverlay
                             // Check if process name matches any executable in the game folder
                             bool nameMatches = gameExecutables.Any(exe =>
                                 string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase));
-                             
+
+                            // Check window title for matches with game name
+                            int titleMatchScore = 0;
+                            if (p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
+                            {
+                                string[] windowTitleWords = p.MainWindowTitle.ToLower().Split(new char[] { ' ', '-', '_', ':', '.', '(', ')', '[', ']' },
+                                    StringSplitOptions.RemoveEmptyEntries);
+
+                                // Count how many words from the game name appear in the window title
+                                titleMatchScore = gameNameWords.Count(gameWord =>
+                                    windowTitleWords.Any(titleWord => titleWord.Contains(gameWord) || gameWord.Contains(titleWord)));
+
+                                if (titleMatchScore > 0)
+                                {
+                                    Debug.WriteLine($"Window title match for '{p.MainWindowTitle}': {titleMatchScore} words match with '{gameName}'");
+                                }
+                            }
+
                             try
                             {
                                 // Try to access the module info
@@ -462,6 +499,11 @@ namespace PlayniteGameOverlay
                                     // Path doesn't match but name does - this is a good candidate
                                     nameMatchCandidates.Add(p);
                                 }
+                                else if (titleMatchScore > 0)
+                                {
+                                    // Window title matches game name
+                                    titleMatchCandidates.Add((p, titleMatchScore));
+                                }
                             }
                             catch
                             {
@@ -470,6 +512,11 @@ namespace PlayniteGameOverlay
                                 {
                                     // Process name matches executable - higher priority
                                     nameMatchCandidates.Add(p);
+                                }
+                                else if (titleMatchScore > 0)
+                                {
+                                    // Window title matches game name
+                                    titleMatchCandidates.Add((p, titleMatchScore));
                                 }
                                 else
                                 {
@@ -482,11 +529,21 @@ namespace PlayniteGameOverlay
                     catch { /* Skip processes we can't access at all */ }
                 }
 
-                // Priority order: direct path match, process name match, then best guess
+                // Priority order: direct path match, process name match, window title match, then best guess
                 if (candidates.Count > 0)
                 {
                     var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
                     Debug.WriteLine($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    return bestMatch;
+                }
+
+                if (titleMatchCandidates.Count > 0)
+                {
+                    // Get the process with the highest title match score
+                    var bestMatch = titleMatchCandidates.OrderByDescending(t => t.MatchCount)
+                                                       .ThenByDescending(t => t.Process.WorkingSet64)
+                                                       .First().Process;
+                    Debug.WriteLine($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
                     return bestMatch;
                 }
 
@@ -512,6 +569,7 @@ namespace PlayniteGameOverlay
 
             return null;
         }
+        
         // Helper method to safely check process path against directory
 
         private void UpdateClock(object sender, EventArgs e)
