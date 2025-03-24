@@ -78,7 +78,7 @@ namespace PlayniteGameOverlay
                 UpdateBattery();
                 batteryUpdateTimer = new DispatcherTimer();
                 batteryUpdateTimer.Interval = TimeSpan.FromSeconds(60);
-                batteryUpdateTimer.Tick += (sender, e) => UpdateBattery();
+                batteryUpdateTimer.Tick += (sender, e) => { UpdateBattery(); UpdateSessionTime(); };
                 batteryUpdateTimer.Start();
             }
 
@@ -328,18 +328,7 @@ namespace PlayniteGameOverlay
 
         public void ShowPlaynite()
         {
-            var playniteProcesses = Process.GetProcesses().Where(p => p.ProcessName.IndexOf("playnite", StringComparison.OrdinalIgnoreCase) >= 0).ToArray();
-
-            foreach (var proc in playniteProcesses)
-            {
-                // Bring the Playnite window to the front
-                SetForegroundWindow(proc.MainWindowHandle);
-                // Restore the window if it's minimized
-                if (IsIconic(proc.MainWindowHandle))
-                {
-                    ShowWindow(proc.MainWindowHandle, SW_RESTORE);
-                }
-            }
+            playniteAPI.Dialogs.GetCurrentAppWindow().Activate();
         }
 
         // Win32 API declarations
@@ -366,7 +355,13 @@ namespace PlayniteGameOverlay
 
             if (runningGame == null)
             {
+                gameProcess = null;
                 return null; // No game is running
+            }
+
+            if(gameProcess != null)
+            {
+                return gameProcess;
             }
 
             try
@@ -535,6 +530,7 @@ namespace PlayniteGameOverlay
                 {
                     var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
                     Debug.WriteLine($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    gameProcess = bestMatch;
                     return bestMatch;
                 }
 
@@ -545,6 +541,7 @@ namespace PlayniteGameOverlay
                                                        .ThenByDescending(t => t.Process.WorkingSet64)
                                                        .First().Process;
                     Debug.WriteLine($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
+                    gameProcess = bestMatch;
                     return bestMatch;
                 }
 
@@ -552,6 +549,7 @@ namespace PlayniteGameOverlay
                 {
                     var bestMatch = nameMatchCandidates.OrderByDescending(p => p.WorkingSet64).First();
                     Debug.WriteLine($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    gameProcess = bestMatch;
                     return bestMatch;
                 }
 
@@ -559,6 +557,7 @@ namespace PlayniteGameOverlay
                 {
                     var bestGuess = inaccessibleCandidates.OrderByDescending(p => p.WorkingSet64).First();
                     Debug.WriteLine($"Using best guess process: {bestGuess.ProcessName} (ID: {bestGuess.Id})");
+                    gameProcess = null;
                     return bestGuess;
                 }
             }
@@ -576,20 +575,15 @@ namespace PlayniteGameOverlay
         private void UpdateClock(object sender, EventArgs e)
         {
             Clock.Text = DateTime.Now.ToString("HH:mm");
-            if(ActiveGame != null && GameStarted.HasValue)
-            {
-                var playTime = DateTime.Now - GameStarted.Value;
-                if (playTime.Hours > 0)
-                {
-                    SessionTime.Text = playTime.ToString(@"hh\:mm\:ss");
-                }
-                else
-                {
-                    SessionTime.Text = playTime.ToString(@"mm\:ss");
-                }
-            }
         }
 
-
+        private void UpdateSessionTime()
+        {
+            if (ActiveGame != null && GameStarted.HasValue)
+            {
+                var playTime = DateTime.Now - GameStarted.Value;
+                SessionTime.Text = playTime.ToString(@"hh\:mm");
+            }
+        }
     }
 }
