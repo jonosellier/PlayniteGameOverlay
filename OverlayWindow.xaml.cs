@@ -264,13 +264,13 @@ namespace PlayniteGameOverlay
                 }
 
                 var playtime = TimeSpan.FromSeconds(runningGame.Playtime);
-                string playtimeString = (int)playtime.TotalMinutes + " mins. played";
+                string playtimeString = (int)playtime.TotalMinutes + " mins.";
                 if (playtime.TotalMinutes >= 120)
                 {
-                    playtimeString = (int)playtime.TotalHours + " hours played";
+                    playtimeString = (int)playtime.TotalHours + " hrs.";
                 }
 
-                Playtime.Text = playtimeString;
+                PlayTime.Text = playtimeString;
             }
             else
             {
@@ -576,6 +576,18 @@ namespace PlayniteGameOverlay
         private void UpdateClock(object sender, EventArgs e)
         {
             Clock.Text = DateTime.Now.ToString("HH:mm");
+            if(ActiveGame != null && GameStarted.HasValue)
+            {
+                var playTime = DateTime.Now - GameStarted.Value;
+                if (playTime.Hours > 0)
+                {
+                    SessionTime.Text = playTime.ToString(@"hh\:mm\:ss");
+                }
+                else
+                {
+                    SessionTime.Text = playTime.ToString(@"mm\:ss");
+                }
+            }
         }
 
 

@@ -141,12 +141,11 @@
             <!-- Content container -->
             <TextBlock x:Name="GameTitle" Foreground="White" FontWeight="Bold" HorizontalAlignment="Left" 
                            Margin="36,4,0,0" Height="56" VerticalAlignment="Top" FontSize="36" Width="1309"><Run Text="Game Name Here"/><LineBreak/><Run/></TextBlock>
-            <TextBlock x:Name="Playtime" TextWrapping="Wrap" Foreground="#FFD0D0D0" FontSize="24" FontWeight="Bold" Margin="0,676,38,0" HorizontalAlignment="Right" VerticalAlignment="Top" Width="375" Height="46" TextAlignment="Right"><Run Text="123 hours"/><LineBreak/><Run/></TextBlock>
-            <Border BorderBrush="#80808080" BorderThickness="4,4,4,4" Width="383" Height="534" Margin="0,120,36,0" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="11,11,11,11" Background="#80808080">
+            <Border BorderBrush="#80808080" BorderThickness="1,1,1,1" Width="377" Height="527" Margin="0,120,36,0" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="8,8,8,8" Background="#80808080">
 
-                <Border BorderBrush="#80808080" BorderThickness="0,0,0,0" Width="375" Height="525" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="8,8,8,8" Margin="0,0,0,0">
+                <Border BorderBrush="#80808080" BorderThickness="0,0,0,0" Width="375" Height="525" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="7,7,7,7" Margin="0,0,0,0">
                     <Border.Clip>
-                        <RectangleGeometry RadiusX="10" RadiusY="10" Rect="0,0,375,525"/>
+                        <RectangleGeometry RadiusX="7" RadiusY="7" Rect="0,0,375,525"/>
                     </Border.Clip>
                     <Image x:Name="GameCoverImage" 
            Stretch="UniformToFill" Width="375" Height="525" VerticalAlignment="Center" HorizontalAlignment="Center" Source="/PlayniteGameOverlay;component/917bd40b-a43c-439f-848c-2f82b49d8590.jpg"/>
@@ -163,6 +162,47 @@
                 <TextBlock x:Name="BatteryText" HorizontalAlignment="Left" Margin="1436,23,0,0" TextWrapping="Wrap" Text="100%" VerticalAlignment="Top" FontWeight="Bold" Foreground="White" Width="37" TextAlignment="Center" Height="16"/>
             </Grid>
             <TextBlock x:Name="ProcessInfo_DEBUG" HorizontalAlignment="Left" Margin="41,446,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Height="266" Width="296" Foreground="White"><Run Text="Debug info goes here"/><LineBreak/><Run/></TextBlock>
+            <Border Background="#FF242424" CornerRadius="10" 
+Width="375" Height="56" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,677,36,0" BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="8,8,8,4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Vertical Divider -->
+                    <Rectangle Grid.Column="1" Grid.Row="0" Width="1" Margin="24,2,24,-11" Fill="#80808080" VerticalAlignment="Stretch"/>
+
+                    <!-- Total Play Time (Column 0) -->
+                    <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <Path Fill="#FFD0D0D0" 
+Width="16" 
+Height="16"
+Data="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="PlayTime" TextWrapping="Wrap" Foreground="#FFFFFFFF" FontSize="20" FontWeight="Bold" Text="123 Hours">
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Session Play Time (Column 2) -->
+                    <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <Path Fill="#FFD0D0D0" 
+Width="16" 
+Height="16"
+Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l.013-.012.354-.354.353.354a.5.5 0 1 0 .707-.707l-1.414-1.415a.5.5 0 1 0-.707.707l.354.354-.354.354-.012.012A6.97 6.97 0 0 0 9 2.071V1h.5a.5.5 0 0 0 0-1zm2 5.6V9a.5.5 0 0 1-.5.5H4.5a.5.5 0 0 1 0-1h3V5.6a.5.5 0 1 1 1 0" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="SessionTime" TextWrapping="Wrap" Foreground="#FFFFFFFF" FontSize="20" FontWeight="Bold" Text="12:34:56">
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Caption Labels - Left Aligned -->
+                    <TextBlock Grid.Column="0" Grid.Row="1" Text="ALL TIME" FontSize="9" Foreground="#80808080" HorizontalAlignment="Left" Margin="24,2,0,0"/>
+                    <TextBlock Grid.Column="2" Grid.Row="1" Text="THIS SESSION" FontSize="9" Foreground="#80808080" HorizontalAlignment="Left" Margin="24,2,0,0"/>
+                </Grid>
+            </Border>
         </Grid>
     </Viewbox>
 </Window>
