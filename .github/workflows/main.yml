@@ -1,0 +1,22 @@
+name: Publish Release Artifact
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Upload release artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./PlayniteGameOverlay_fc75626e-ec69-4287-972a-b86298555ebb_1_0.pext
+          asset_name: PlayniteGameOverlay_fc75626e-ec69-4287-972a-b86298555ebb_1_0.pext
+          asset_content_type: application/octet-stream
