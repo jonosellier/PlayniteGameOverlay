@@ -53,8 +53,7 @@ namespace PlayniteGameOverlay
 
             // Update immediately
             UpdateClock(null, EventArgs.Empty);
-            UpdateBattery();
-            UpdateSessionTime();
+            UpdateBattery(null, EventArgs.Empty);
 
             // Show the window
             this.Show();
@@ -119,15 +118,10 @@ namespace PlayniteGameOverlay
                 BAR_TOP = BatteryBar.Margin.Top;
                 barWidth = 0;
                 Battery.Visibility = Visibility.Visible;
-                UpdateBattery();
-
+                UpdateBattery(null, EventArgs.Empty);
                 batteryUpdateTimer = new DispatcherTimer();
                 batteryUpdateTimer.Interval = TimeSpan.FromSeconds(60);
-                batteryUpdateTimer.Tick += (sender, e) =>
-                {
-                    UpdateBattery();
-                    UpdateSessionTime();
-                };
+                batteryUpdateTimer.Tick += UpdateBattery;
                 batteryUpdateTimer.Start();
             }
         }
@@ -206,7 +200,7 @@ namespace PlayniteGameOverlay
             return $"{(int)playtime.TotalHours} hrs.";
         }
 
-        private void UpdateBattery()
+        private void UpdateBattery(object sender, EventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -219,23 +213,17 @@ namespace PlayniteGameOverlay
             });
         }
 
-        private void UpdateSessionTime()
+        private void UpdateClock(object sender, EventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
                 if (_currentGameData != null)
                 {
                     var playTime = DateTime.Now - _currentGameData.GameStartTime;
-                    SessionTime.Text = playTime.ToString(@"hh\:mm");
+                    SessionTime.Text = $"{playTime.Hours}:{playTime.Minutes:D2}:{playTime.Seconds:D2}";
                 }
-            });
-        }
-
-        private void UpdateClock(object sender, EventArgs e)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                Clock.Text = DateTime.Now.ToString("HH:mm");
+                Clock.Text = DateTime.Now.ToString("hh:mm");
+                Clock.Text = DateTime.Now.ToString("hh:mm");
             });
         }
 
