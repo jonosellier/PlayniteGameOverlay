@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -315,7 +316,7 @@ namespace PlayniteGameOverlay
         {
             if (IS_DEBUG)
             {
-                Debug.WriteLine("GameOverlay["+tag+"]: "+msg);
+                Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
             }
             logger.Debug(msg);
         }
@@ -325,12 +326,43 @@ namespace PlayniteGameOverlay
         {
             try
             {
-                playniteAPI.Dialogs.GetCurrentAppWindow().Activate();
+                Process[] processes = Process.GetProcessesByName("Playnite.DesktopApp");
+                if (processes.Length == 0)
+                {
+                    processes = Process.GetProcessesByName("Playnite.FullscreenApp");
+                }
+
+                if (processes.Length > 0)
+                {
+                    // Use the Win32 API calls you already have to activate the window
+                    Process proc = processes[0];
+                    if (IsIconic(proc.MainWindowHandle))
+                    {
+                        ShowWindow(proc.MainWindowHandle, SW_RESTORE);
+                    }
+                    SetForegroundWindow(proc.MainWindowHandle);
+                    log("Activated Playnite process: " + proc.ProcessName);
+                }
+                else
+                {
+                    log("Could not find any Playnite process to activate", "WARNING");
+                }
             }
             catch (Exception ex)
             {
                 logger.Error($"Error showing Playnite: {ex}");
             }
         }
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_RESTORE = 9;
     }
 }
