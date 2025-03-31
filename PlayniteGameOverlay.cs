@@ -87,7 +87,7 @@ namespace PlayniteGameOverlay
         {
             try
             {
-                var gameStarted = DateTime.Now;
+                gameStarted = DateTime.Now;
                 var gameOverlayData = CreateGameOverlayData(args.Game, args.StartedProcessId, gameStarted);
                 overlayWindow.UpdateGameOverlay(gameOverlayData);
             }
