@@ -58,6 +58,9 @@ namespace PlayniteGameOverlay
             // Show the window
             this.Show();
 
+            // Activate the window to bring it to the foreground and set focus
+            this.Activate();
+
             // Set focus to first button when showing overlay
             ReturnToGameButton.Focus();
         }

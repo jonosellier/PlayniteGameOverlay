@@ -23,6 +23,8 @@ namespace PlayniteGameOverlay
 
         public override Guid Id { get; } = Guid.Parse("fc75626e-ec69-4287-972a-b86298555ebb");
 
+        DateTime gameStarted;
+
         public PlayniteGameOverlay(IPlayniteAPI api) : base(api)
         {
             playniteAPI = api;
@@ -85,7 +87,8 @@ namespace PlayniteGameOverlay
         {
             try
             {
-                var gameOverlayData = CreateGameOverlayData(args.Game, args.StartedProcessId);
+                var gameStarted = DateTime.Now;
+                var gameOverlayData = CreateGameOverlayData(args.Game, args.StartedProcessId, gameStarted);
                 overlayWindow.UpdateGameOverlay(gameOverlayData);
             }
             catch (Exception ex)
@@ -103,12 +106,12 @@ namespace PlayniteGameOverlay
         {
             if (game == null) return;
 
-            var gameOverlayData = CreateGameOverlayData(game, FindRunningGameProcess(game)?.Id);
+            var gameOverlayData = CreateGameOverlayData(game, FindRunningGameProcess(game)?.Id, gameStarted);
             overlayWindow.UpdateGameOverlay(gameOverlayData);
             overlayWindow.ShowOverlay();
         }
 
-        private GameOverlayData CreateGameOverlayData(Game game, int? processId)
+        private GameOverlayData CreateGameOverlayData(Game game, int? processId, DateTime StartTime)
         {
             if (game == null) return null;
 
@@ -116,7 +119,7 @@ namespace PlayniteGameOverlay
             {
                 GameName = game.Name,
                 ProcessId = processId ?? -1,
-                GameStartTime = DateTime.Now,
+                GameStartTime = StartTime,
                 Playtime = TimeSpan.FromSeconds(game.Playtime),
                 CoverImagePath = GetFullCoverImagePath(game)
             };
@@ -160,6 +163,9 @@ namespace PlayniteGameOverlay
                         additionalNames.Add(exe.Replace("-", ""));
                         additionalNames.Add(exe.Replace("_", ""));
                         additionalNames.Add(exe.Replace(" ", ""));
+                        additionalNames.Add(exe.Replace("-", " "));
+                        additionalNames.Add(exe.Replace("_", " "));
+                        additionalNames.Add(exe.Replace(" ", " "));
                     }
                     gameExecutables.AddRange(additionalNames);
 
@@ -265,7 +271,7 @@ namespace PlayniteGameOverlay
                     catch { /* Skip processes we can't access at all */ }
                 }
 
-                // Priority order: direct path match, process name match, window title match, then best guess
+                // Priority order: direct path match, window title match, process name match, then best guess
                 if (candidates.Count > 0)
                 {
                     var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
