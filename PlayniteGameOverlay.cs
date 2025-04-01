@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.Json.Serialization;
+using System.Text.Json;
 using System.Windows.Forms;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -26,6 +28,36 @@ namespace PlayniteGameOverlay
 
         DateTime gameStarted;
 
+        // SuccessStory integration
+        private bool isSuccessStoryAvailable = false;
+        private Guid successStoryId = Guid.Parse("cebe6d32-8c46-4459-b993-5a5189d60788"); // SuccessStory plugin ID
+
+        private void CheckSuccessStoryAvailability()
+        {
+            try
+            {
+                var plugins = playniteAPI.Addons.Plugins;
+                isSuccessStoryAvailable = plugins.Any(p => p.Id == successStoryId);
+
+                if (isSuccessStoryAvailable)
+                {
+                    log("SuccessStory plugin detected, achievement integration enabled");
+                }
+                else
+                {
+                    log("SuccessStory plugin not found, achievement integration disabled");
+                }
+            }
+            catch (Exception ex)
+            {
+                log($"Error checking for SuccessStory plugin: {ex.Message}", "ERROR");
+                isSuccessStoryAvailable = false;
+            }
+        }
+
+
+
+
         public PlayniteGameOverlay(IPlayniteAPI api) : base(api)
         {
             playniteAPI = api;
@@ -35,6 +67,9 @@ namespace PlayniteGameOverlay
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             logger.Info("Starting Overlay Extension...");
+
+            // Check if SuccessStory is installed
+            CheckSuccessStoryAvailability();
 
             // Initialize overlay window
             overlayWindow = new OverlayWindow();
@@ -116,14 +151,64 @@ namespace PlayniteGameOverlay
         {
             if (game == null) return null;
 
+            var achievements = GetGameAchievements(game);
+
             return new GameOverlayData
             {
                 GameName = game.Name,
                 ProcessId = processId ?? -1,
                 GameStartTime = StartTime,
                 Playtime = TimeSpan.FromSeconds(game.Playtime),
-                CoverImagePath = GetFullCoverImagePath(game)
+                CoverImagePath = GetFullCoverImagePath(game),
+                Achievements = achievements
             };
+        }
+
+        private List<AchievementData> GetGameAchievements(Game game)
+        {
+            log($"Retrieving achievements for game {game.Name} (ID: {game.Id}, SuccessStory Enabled: {isSuccessStoryAvailable})");
+            var achievements = new List<AchievementData>();
+
+            if (!isSuccessStoryAvailable || game == null)
+                return achievements;
+
+            try
+            {
+                // Access SuccessStory's data through Playnite extension API
+                var successStory = playniteAPI.Addons.Plugins.FirstOrDefault(p => p.Id == successStoryId);
+                if (successStory != null)
+                {
+                    try
+                    {
+                        // Find SuccessStory's data directory
+                        string successStoryDir = Path.Combine(
+                            playniteAPI.Paths.ExtensionsDataPath, successStoryId.ToString(), "SuccessStory");
+
+                        if (Directory.Exists(successStoryDir))
+                        {
+                            // Look for a file containing achievements for this game
+                            string achievementsFile = Path.Combine(successStoryDir, $"{game.Id}.json");
+                            if (File.Exists(achievementsFile))
+                            {
+                                string achievementsJson = File.ReadAllText(achievementsFile);
+                                achievements = ParseSuccessStoryData(achievementsJson);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error($"Failed to get achievements from file: {ex.Message}");
+                    }
+                }
+
+                logger.Info($"Retrieved {achievements.Count} achievements for game {game.Name}");
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error retrieving achievements from SuccessStory: {ex.Message}");
+            }
+
+            return achievements;
         }
 
         private string GetFullCoverImagePath(Game game)
@@ -354,6 +439,56 @@ namespace PlayniteGameOverlay
             }
         }
 
+        // Method to parse the JSON file and convert to your AchievementData format
+        private List<AchievementData> ParseSuccessStoryData(string jsonData)
+        {
+            var achievements = new List<AchievementData>();
+
+            try
+            {
+                
+                var successStoryData = JsonSerializer.Deserialize<SuccessStoryData>(jsonData);
+
+                if (successStoryData?.Items == null)
+                {
+                    logger.Error("Failed to parse SuccessStory data: Items is null");
+                    return achievements;
+                }
+
+                foreach (var item in successStoryData.Items)
+                {
+                    bool isUnlocked = !string.IsNullOrEmpty(item.DateUnlockedStr);
+                    DateTime? unlockDate = null;
+
+                    if (isUnlocked)
+                    {
+                        // Try to parse the date
+                        if (DateTime.TryParse(item.DateUnlockedStr, out DateTime parsedDate))
+                        {
+                            unlockDate = parsedDate;
+                        }
+                    }
+
+                    achievements.Add(new AchievementData
+                    {
+                        Name = item.Name,
+                        Description = item.Description,
+                        IsUnlocked = isUnlocked,
+                        UnlockDate = unlockDate,
+                        IconUrl = isUnlocked ? item.UrlUnlocked : item.UrlLocked
+                    });
+                }
+
+                log($"Successfully parsed {achievements.Count} achievements from SuccessStory");
+            }
+            catch (Exception ex)
+            {
+                log($"Error parsing SuccessStory file: {ex.Message}", "ERROR");
+            }
+
+            return achievements;
+        }
+
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -364,5 +499,53 @@ namespace PlayniteGameOverlay
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         private const int SW_RESTORE = 9;
+    }
+
+    public class AchievementData
+    {
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public bool IsUnlocked { get; set; }
+        public DateTime? UnlockDate { get; set; }
+        public string IconUrl { get; set; }
+    }
+
+    // Update your GameOverlayData class to include achievements
+    public class GameOverlayData
+    {
+        public string GameName { get; set; }
+        public int ProcessId { get; set; }
+        public DateTime GameStartTime { get; set; }
+        public TimeSpan Playtime { get; set; }
+        public string CoverImagePath { get; set; }
+        public List<AchievementData> Achievements { get; set; }
+    }
+
+    // Define classes that match the JSON structure
+    public class SuccessStoryData
+    {
+        [JsonPropertyName("Items")]
+        public List<SuccessStoryAchievement> Items { get; set; }
+
+        [JsonPropertyName("Name")]
+        public string Name { get; set; }
+    }
+
+    public class SuccessStoryAchievement
+    {
+        [JsonPropertyName("Name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("Description")]
+        public string Description { get; set; }
+
+        [JsonPropertyName("DateUnlocked")]
+        public string DateUnlockedStr { get; set; }
+
+        [JsonPropertyName("UrlUnlocked")]
+        public string UrlUnlocked { get; set; }
+
+        [JsonPropertyName("UrlLocked")]
+        public string UrlLocked { get; set; }
     }
 }

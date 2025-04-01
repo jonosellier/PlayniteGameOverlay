@@ -202,6 +202,50 @@ Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l
                     <TextBlock Grid.Column="2" Grid.Row="1" Text="THIS SESSION" FontSize="9" Foreground="#80808080" HorizontalAlignment="Left" Margin="24,2,0,0"/>
                 </Grid>
             </Border>
+            <Border x:Name="AchFade1" Background="#FF121212" CornerRadius="9" Padding="20,16,20,16" 
+                Width="352" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="52,518,0,0" 
+                BorderBrush="#30808080" BorderThickness="1,1,1,1"
+                Height="{Binding ActualHeight, ElementName=AchievementPanel}"/>
+            <Border x:Name="AchFade2" Background="#FF1B1B1B" CornerRadius="9.5" Padding="20,16,20,16" 
+                Width="365" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="46,514,0,0" 
+                BorderBrush="#40808080" BorderThickness="1,1,1,1"
+                Height="{Binding ActualHeight, ElementName=AchievementPanel}"/>
+            <Border x:Name="AchievementPanel" Background="#FF242424" CornerRadius="10" Padding="20,16,20,16" 
+                Width="377" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="40,510,0,0" BorderBrush="#80808080" BorderThickness="1,1,1,1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Achievement Icon -->
+                    <Border Grid.Column="0" Width="32" Height="32" CornerRadius="4" Background="#80808080" Margin="0,6,15,0" VerticalAlignment="Top">
+                        <Border.Clip>
+                            <RectangleGeometry RadiusX="4" RadiusY="4" Rect="0,0,32,32"/>
+                        </Border.Clip>
+                        <Image x:Name="LastAchievementIcon" Stretch="UniformToFill" Width="32" Height="32" Source="https://icons.veryicon.com/png/o/business/classic-icon/trophy-20.png"/>
+                    </Border>
+
+                    <!-- Achievement Info -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Path Fill="#D0808080" Height="11" Width="12" Stretch="Uniform" Data="M0 0.75c0-0.414 0.336-0.75 0.75-0.75h2.885c0.019 0 0.037 0.001 0.056 0.002h6.621c0.018-0.001 0.036-0.002 0.054-0.002H13.25c0.414 0 0.75 0.336 0.75 0.75V3.635c0 1.859-1.396 3.392-3.197 3.609-0.447 1.369-1.614 2.413-3.053 2.686V12.5h2.615c0.414 0 0.75 0.336 0.75 0.75s-0.336 0.75-0.75 0.75H7.026c-0.009 0-0.017 0-0.026 0s-0.017 0-0.026 0H3.635c-0.414 0-0.75-0.336-0.75-0.75s0.336-0.75 0.75-0.75H6.25V9.93c-1.439-0.273-2.605-1.317-3.053-2.686C1.396 7.027 0 5.494 0 3.635V0.75ZM2.885 5.634V1.5H1.5v2.135c0 0.915 0.576 1.696 1.385 1.999ZM11.115 1.5v4.134c0.809-0.304 1.385-1.084 1.385-1.999V1.5h-1.385Z" Margin="0,0,5,-1"/>
+                            <TextBlock x:Name="LastAchievementLabel" Text="RECENT ACHIEVEMENT" FontSize="11" Foreground="#80808080"/>
+                            <TextBlock Text="&#8226;" FontSize="11" Foreground="#60808080" Margin="4,0,4,0"/>
+                            <TextBlock x:Name="LastAchievementDate" Text="2 DAYS AGO" FontSize="11" Foreground="#80808080"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="LastAchievementName" Text="No Achievements Unlocked" 
+                   Foreground="White" FontWeight="Bold" FontSize="16" TextTrimming="CharacterEllipsis"/>
+
+                        <TextBlock x:Name="LastAchievementDescription" Text="Unlock an achievement" 
+                   Foreground="#FFD0D0D0" FontSize="12" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" 
+                   MaxHeight="36"/>
+                    </StackPanel>
+                </Grid>
+
+            </Border>
+            <TextBlock x:Name="UnlockPercent" HorizontalAlignment="Left" Margin="60,485,0,0" TextWrapping="Wrap" Text="Unlocked 123/456 Achievements" VerticalAlignment="Top" Foreground="White" FontWeight="Bold"/>
         </Grid>
     </Viewbox>
 </Window>

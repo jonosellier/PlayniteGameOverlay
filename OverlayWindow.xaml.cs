@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Forms;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Linq;
 
 namespace PlayniteGameOverlay
 {
@@ -137,7 +138,56 @@ namespace PlayniteGameOverlay
                 _currentGameData = gameData;
                 UpdateGameInfo(gameData);
                 UpdateDebugInfo(gameData);
+                UpdateAchievementData(gameData);
             });
+        }
+
+        private void UpdateAchievementData(GameOverlayData gameData)
+        {
+            if (gameData?.Achievements != null && gameData.Achievements.Count > 0)
+            {
+                var mostRecentAchievement = gameData.Achievements.FindAll(a => a.IsUnlocked).OrderByDescending(a => a.UnlockDate).FirstOrDefault();
+                if(mostRecentAchievement == null)
+                {
+                    AchFade1.Visibility = Visibility.Collapsed;
+                    AchFade2.Visibility = Visibility.Collapsed;
+                    AchievementPanel.Visibility = Visibility.Collapsed;
+                    UnlockPercent.Visibility = Visibility.Collapsed;
+                    return;
+                }
+                else if (mostRecentAchievement.UnlockDate != null)
+                {
+                    TimeSpan timeSinceUnlock = (TimeSpan)(DateTime.Now - mostRecentAchievement.UnlockDate);
+                    LastAchievementName.Text = mostRecentAchievement.Name;
+                    LastAchievementDate.Text = timeSinceUnlock.TotalDays < 1 ? "Today" : $"{(int)timeSinceUnlock.TotalDays} days ago";
+                    LastAchievementDescription.Text = mostRecentAchievement.Description;
+                    try
+                    {
+                        var bitmap = new BitmapImage();
+                        bitmap.BeginInit();
+                        bitmap.UriSource = new Uri(mostRecentAchievement.IconUrl);
+                        bitmap.CacheOption = BitmapCacheOption.OnLoad; // This loads the image fully before displaying
+                        bitmap.EndInit();
+                        LastAchievementIcon.Source = bitmap;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"ERROR: Failed to load achievement icon: {ex.Message}");
+                    }
+                    UnlockPercent.Text = $"Unlocked {gameData.Achievements.Count(a => a.IsUnlocked)}/{gameData.Achievements.Count} Achievements";
+                    AchievementPanel.Visibility = Visibility.Visible;
+                    UnlockPercent.Visibility = Visibility.Visible;
+                    AchFade2.Visibility = Visibility.Visible;
+                    AchFade1.Visibility = Visibility.Visible;
+                }
+            }
+            else
+            {
+                AchFade1.Visibility = Visibility.Collapsed;
+                AchFade2.Visibility = Visibility.Collapsed;
+                AchievementPanel.Visibility = Visibility.Collapsed;
+                UnlockPercent.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void UpdateGameInfo(GameOverlayData gameData)
@@ -299,15 +349,5 @@ namespace PlayniteGameOverlay
 
         // Event to request showing Playnite (to be handled by the plugin)
         public event Action OnShowPlayniteRequested;
-    }
-
-    // Data transfer object for game information
-    public class GameOverlayData
-    {
-        public string GameName { get; set; }
-        public int ProcessId { get; set; }
-        public DateTime GameStartTime { get; set; }
-        public TimeSpan Playtime { get; set; }
-        public string CoverImagePath { get; set; }
     }
 }
