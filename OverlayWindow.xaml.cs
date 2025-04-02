@@ -48,6 +48,7 @@ namespace PlayniteGameOverlay
             InitializeComponent();
 
             // Set the window to fullscreen
+            // Set the window to fullscreen
             this.WindowState = WindowState.Maximized;
 
             // Connect button click events
@@ -62,10 +63,32 @@ namespace PlayniteGameOverlay
             clockTimer.Start();
 
             InitializeBatteryDisplay();
+
             InitializeController();
+
+            // Disable keyboard navigation
+            this.PreviewKeyDown += OverlayWindow_PreviewKeyDown;
 
             // Set initial focus to first button
             ReturnToGameButton.Focus();
+        }
+
+        private void OverlayWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            // List of keys to block
+            var blockedKeys = new[]
+            {
+                System.Windows.Input.Key.Tab,
+                System.Windows.Input.Key.Left,
+                System.Windows.Input.Key.Right,
+                System.Windows.Input.Key.Up,
+                System.Windows.Input.Key.Down
+            };
+
+            if (blockedKeys.Contains(e.Key))
+            {
+                e.Handled = true; // Prevent navigation
+            }
         }
 
         public void ShowOverlay()
