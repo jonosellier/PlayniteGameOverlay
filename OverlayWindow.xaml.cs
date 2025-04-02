@@ -6,11 +6,24 @@ using System.Windows.Forms;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Linq;
+using SDL2;
+using System.Windows.Input;
+using SharpDX.XInput;
 
 namespace PlayniteGameOverlay
 {
     public partial class OverlayWindow : Window
     {
+        private bool IS_DEBUG = true;
+
+        private void log(string msg, string tag = "DEBUG")
+        {
+            if (IS_DEBUG)
+            {
+                Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
+            }
+        }
+
         private readonly DispatcherTimer clockTimer;
         private DispatcherTimer batteryUpdateTimer;
 
@@ -22,6 +35,13 @@ namespace PlayniteGameOverlay
         private double BAR_RIGHT;
         private double BAR_TOP;
         private double barWidth;
+
+        private DateTime lastUpTime = DateTime.MinValue;
+        private DateTime lastDownTime = DateTime.MinValue;
+        private DateTime lastLeftTime = DateTime.MinValue;
+        private DateTime lastRightTime = DateTime.MinValue;
+
+        private const int DEBOUNCE_THRESHOLD = 200; // 200 milliseconds debounce threshold
 
         public OverlayWindow()
         {
@@ -42,6 +62,7 @@ namespace PlayniteGameOverlay
             clockTimer.Start();
 
             InitializeBatteryDisplay();
+            InitializeController();
 
             // Set initial focus to first button
             ReturnToGameButton.Focus();
@@ -76,6 +97,11 @@ namespace PlayniteGameOverlay
                 {
                     batteryUpdateTimer.Start();
                 }
+
+                if (controllerTimer != null)
+                {
+                    controllerTimer.Start();
+                }
             });
         }
 
@@ -89,11 +115,24 @@ namespace PlayniteGameOverlay
                 {
                     batteryUpdateTimer.Stop();
                 }
+
+                if (controllerTimer != null)
+                {
+                    controllerTimer.Stop();
+                }
             });
         }
 
         protected override void OnClosed(EventArgs e)
         {
+                CloseController();
+            // Clean up SDL
+            if (sdlInitialized)
+            {
+                SDL.SDL_Quit();
+                sdlInitialized = false;
+            }
+
             // Stop timers
             PauseTimers();
 
@@ -334,6 +373,278 @@ namespace PlayniteGameOverlay
                 return null;
             }
         }
+
+
+        #region SDL stuff
+
+        private IntPtr controller = IntPtr.Zero;
+
+        private bool sdlInitialized = false;
+        private int controllerId = -1;
+        private DispatcherTimer controllerTimer;
+
+        private void InitializeController()
+        {
+            try
+            {
+                log("Initializing SDL controller support", "SDL");
+
+                // Initialize SDL with game controller support
+                if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER) < 0)
+                {
+                    string error = SDL.SDL_GetError();
+                    log($"SDL could not initialize! SDL Error: {error}", "SDL_ERROR");
+                    return;
+                }
+
+                sdlInitialized = true;
+                log("SDL initialized successfully", "SDL");
+
+                // Look for connected controllers
+                int numJoysticks = SDL.SDL_NumJoysticks();
+                log($"Found {numJoysticks} joysticks/controllers", "SDL");
+
+                // Try to find a connected compatible controller
+                for (int i = 0; i < numJoysticks; i++)
+                {
+                    if (SDL.SDL_IsGameController(i) == SDL.SDL_bool.SDL_TRUE)
+                    {
+                        controllerId = i;
+                        log($"Found compatible game controller at index {i}", "SDL");
+
+                        // Open the controller here, and keep it open
+                        controller = SDL.SDL_GameControllerOpen(controllerId);
+                        if (controller == IntPtr.Zero)
+                        {
+                            log($"Could not open controller! SDL Error: {SDL.SDL_GetError()}", "SDL_ERROR");
+                            return;
+                        }
+
+                        // Optional: Log controller mapping
+                        string mapping = SDL.SDL_GameControllerMapping(controller);
+                        log($"Controller mapping: {mapping}", "SDL_DEBUG");
+
+                        break;
+                    }
+                }
+
+                if (controllerId == -1)
+                {
+                    log("No compatible game controllers found", "SDL");
+                    return;
+                }
+
+                // Set up controller polling timer (poll @ 60Hz)
+                log("Setting up controller polling timer", "SDL");
+                controllerTimer = new DispatcherTimer();
+                controllerTimer.Interval = TimeSpan.FromMilliseconds(16.67);
+                controllerTimer.Tick += PollControllerInput;
+                controllerTimer.Start();
+                log("Controller polling timer started", "SDL");
+            }
+            catch (Exception ex)
+            {
+                log($"Error initializing SDL: {ex.Message}", "SDL_ERROR");
+                log($"Stack trace: {ex.StackTrace}", "SDL_ERROR");
+            }
+        }
+
+        private void CloseController()
+        {
+            if (controller != IntPtr.Zero)
+            {
+                SDL.SDL_GameControllerClose(controller);
+                controller = IntPtr.Zero;
+                log("Controller closed", "SDL");
+            }
+        }
+
+        private void PollControllerInput(object sender, EventArgs e)
+        {
+            // Ensure that the controller is initialized and opened
+            if (controller == IntPtr.Zero)
+            {
+                log("Controller not open, skipping polling", "SDL");
+                return;
+            }
+
+            // Process SDL events (optional, but can be useful for other input events)
+            SDL.SDL_Event sdlEvent;
+            while (SDL.SDL_PollEvent(out sdlEvent) != 0)
+            {
+                log($"SDL event type: {sdlEvent.type}", "SDL_EVENT");
+
+                // You can add handling for other event types if needed, such as controller device additions/removals
+                if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEADDED)
+                {
+                    log($"Controller device added: {sdlEvent.cdevice.which}", "SDL_EVENT");
+                }
+                else if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEREMOVED)
+                {
+                    log($"Controller device removed: {sdlEvent.cdevice.which}", "SDL_EVENT");
+                }
+            }
+
+            // Update the controller's state (fetch input states like button presses, axis movements, etc.)
+            SDL.SDL_GameControllerUpdate();
+
+            // Check if the A button is pressed (used for selection)
+            bool aPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_A) == 1;
+
+            // Check D-Pad buttons (Up, Down, Left, Right)
+            bool dpadUp = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_UP) == 1;
+            bool dpadDown = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_DOWN) == 1;
+            bool dpadLeft = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_LEFT) == 1;
+            bool dpadRight = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_RIGHT) == 1;
+
+            // Check the left analog stick axis values
+            short leftX = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTX);
+            short leftY = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTY);
+
+            // Log raw input values for debugging purposes
+            log($"Raw input - A:{aPressed} DPad:({dpadUp},{dpadDown},{dpadLeft},{dpadRight}) LeftStick:({leftX},{leftY})", "SDL_RAW");
+
+            // Define a deadzone for the analog sticks (about 30% of max value)
+            const short DEADZONE = 10000;
+
+            // Combine D-Pad and Left Stick for movement detection
+            bool moveUp = dpadUp || leftY < -DEADZONE;
+            bool moveDown = dpadDown || leftY > DEADZONE;
+            bool moveLeft = dpadLeft || leftX < -DEADZONE;
+            bool moveRight = dpadRight || leftX > DEADZONE;
+
+            // Log controller inputs when they happen (if any input is detected)
+            if (moveUp || moveDown || moveLeft || moveRight || aPressed)
+            {
+                log($"Controller input: Up:{moveUp} Down:{moveDown} Left:{moveLeft} Right:{moveRight} A:{aPressed}", "SDL_INPUT");
+            }
+
+
+            // Debounce the navigation actions
+            bool canMoveUp = DateTime.Now - lastUpTime > TimeSpan.FromMilliseconds(DEBOUNCE_THRESHOLD);
+            bool canMoveDown = DateTime.Now - lastDownTime > TimeSpan.FromMilliseconds(DEBOUNCE_THRESHOLD);
+            bool canMoveLeft = DateTime.Now - lastLeftTime > TimeSpan.FromMilliseconds(DEBOUNCE_THRESHOLD);
+            bool canMoveRight = DateTime.Now - lastRightTime > TimeSpan.FromMilliseconds(DEBOUNCE_THRESHOLD);
+
+            // Handle navigation based on the input
+            Dispatcher.Invoke(() =>
+            {
+
+                // Log controller inputs when they happen (if any input is detected)
+                if (moveUp && canMoveUp)
+                {
+                    log("Navigating UP", "SDL_NAV");
+                    FocusPreviousElement();
+                    lastUpTime = DateTime.Now; // Update the time of the last navigation event
+                }
+
+                if (moveDown && canMoveDown)
+                {
+                    log("Navigating DOWN", "SDL_NAV");
+                    FocusNextElement();
+                    lastDownTime = DateTime.Now; // Update the time of the last navigation event
+                }
+
+                if (moveLeft && canMoveLeft)
+                {
+                    log("Navigating LEFT", "SDL_NAV");
+                    FocusLeftElement();
+                    lastLeftTime = DateTime.Now; // Update the time of the last navigation event
+                }
+
+                if (moveRight && canMoveRight)
+                {
+                    log("Navigating RIGHT", "SDL_NAV");
+                    FocusRightElement();
+                    lastRightTime = DateTime.Now; // Update the time of the last navigation event
+                }
+
+                // Handle the A button for selection
+                if (aPressed)
+                {
+                    log("Button A pressed - clicking focused element", "SDL_NAV");
+                    ClickFocusedElement();
+                }
+            });
+        }
+
+        private void FocusNextElement()
+        {
+            UIElement focusedElement = Keyboard.FocusedElement as UIElement;
+            if (focusedElement != null)
+            {
+                log($"Moving focus from {focusedElement.GetType().Name} to next element", "SDL_NAV");
+                focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+                log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
+            }
+            else
+            {
+                log("No element currently has focus for next navigation", "SDL_NAV");
+            }
+        }
+
+        private void FocusPreviousElement()
+        {
+            UIElement focusedElement = Keyboard.FocusedElement as UIElement;
+            if (focusedElement != null)
+            {
+                log($"Moving focus from {focusedElement.GetType().Name} to previous element", "SDL_NAV");
+                focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Previous));
+                log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
+            }
+            else
+            {
+                log("No element currently has focus for previous navigation", "SDL_NAV");
+            }
+        }
+
+        private void FocusLeftElement()
+        {
+            UIElement focusedElement = Keyboard.FocusedElement as UIElement;
+            if (focusedElement != null)
+            {
+                log($"Moving focus from {focusedElement.GetType().Name} to left element", "SDL_NAV");
+                focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Left));
+                log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
+            }
+            else
+            {
+                log("No element currently has focus for left navigation", "SDL_NAV");
+            }
+        }
+
+        private void FocusRightElement()
+        {
+            UIElement focusedElement = Keyboard.FocusedElement as UIElement;
+            if (focusedElement != null)
+            {
+                log($"Moving focus from {focusedElement.GetType().Name} to right element", "SDL_NAV");
+                focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Right));
+                log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
+            }
+            else
+            {
+                log("No element currently has focus for right navigation", "SDL_NAV");
+            }
+        }
+
+        private void ClickFocusedElement()
+        {
+            if (Keyboard.FocusedElement is System.Windows.Controls.Button button)
+            {
+                log($"Clicking button: {button.Name}", "SDL_NAV");
+                // Create a click routed event
+                RoutedEventArgs args = new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent);
+
+                // Raise the event on the button
+                button.RaiseEvent(args);
+            }
+            else
+            {
+                log($"Focused element is not a button: {Keyboard.FocusedElement?.GetType().Name ?? "null"}", "SDL_NAV");
+            }
+        }
+        #endregion
 
         // Win32 API Declarations
         [DllImport("user32.dll")]
