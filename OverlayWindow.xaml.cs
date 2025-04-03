@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 using System.Linq;
 using SDL2;
 using System.Windows.Input;
-using SharpDX.XInput;
+using System.Windows.Interop;
 
 namespace PlayniteGameOverlay
 {
@@ -41,7 +41,7 @@ namespace PlayniteGameOverlay
         private DateTime lastLeftTime = DateTime.MinValue;
         private DateTime lastRightTime = DateTime.MinValue;
 
-        private const int DEBOUNCE_THRESHOLD = 200; // 200 milliseconds debounce threshold
+        private const int DEBOUNCE_THRESHOLD = 100; // 100 milliseconds debounce threshold
 
         public OverlayWindow()
         {
@@ -106,8 +106,23 @@ namespace PlayniteGameOverlay
             // Activate the window to bring it to the foreground and set focus
             this.Activate();
 
+            ForceFocusOverlay();
+
             // Set focus to first button when showing overlay
             ReturnToGameButton.Focus();
+        }
+
+        public void ForceFocusOverlay()
+        {
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            IntPtr foregroundWindow = GetForegroundWindow();
+
+            uint foregroundThread = GetWindowThreadProcessId(foregroundWindow, out _);
+            uint currentThread = GetCurrentThreadId();
+
+            AttachThreadInput(currentThread, foregroundThread, true);
+            SetForegroundWindow(hwnd);
+            AttachThreadInput(currentThread, foregroundThread, false);
         }
 
         private void ResumeTimers()
@@ -514,6 +529,9 @@ namespace PlayniteGameOverlay
             // Check if the A button is pressed (used for selection)
             bool aPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_A) == 1;
 
+            // Check if the B button is pressed (used for hiding the overlay)
+            bool bPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_B) == 1;
+
             // Check D-Pad buttons (Up, Down, Left, Right)
             bool dpadUp = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_UP) == 1;
             bool dpadDown = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_DOWN) == 1;
@@ -525,7 +543,7 @@ namespace PlayniteGameOverlay
             short leftY = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTY);
 
             // Log raw input values for debugging purposes
-            log($"Raw input - A:{aPressed} DPad:({dpadUp},{dpadDown},{dpadLeft},{dpadRight}) LeftStick:({leftX},{leftY})", "SDL_RAW");
+            log($"Raw input - A:{aPressed} B:{bPressed} DPadUDLR:({dpadUp},{dpadDown},{dpadLeft},{dpadRight}) LeftStick:({leftX},{leftY})", "SDL_RAW");
 
             // Define a deadzone for the analog sticks (about 30% of max value)
             const short DEADZONE = 10000;
@@ -539,7 +557,7 @@ namespace PlayniteGameOverlay
             // Log controller inputs when they happen (if any input is detected)
             if (moveUp || moveDown || moveLeft || moveRight || aPressed)
             {
-                log($"Controller input: Up:{moveUp} Down:{moveDown} Left:{moveLeft} Right:{moveRight} A:{aPressed}", "SDL_INPUT");
+                log($"Controller input: Up:{moveUp} Down:{moveDown} Left:{moveLeft} Right:{moveRight} A:{aPressed} B:{bPressed}", "SDL_INPUT");
             }
 
 
@@ -587,6 +605,12 @@ namespace PlayniteGameOverlay
                 {
                     log("Button A pressed - clicking focused element", "SDL_NAV");
                     ClickFocusedElement();
+                }
+                // Handle the B button for exit
+                if (bPressed)
+                {
+                    log("Button B pressed - Hiding overlay", "SDL_NAV");
+                    this.Hide();
                 }
             });
         }
@@ -678,6 +702,18 @@ namespace PlayniteGameOverlay
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
 
         private const int SW_RESTORE = 9;
 
