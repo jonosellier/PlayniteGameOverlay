@@ -11,6 +11,8 @@ using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
+using SDL2;
+using System.Windows.Threading;
 
 namespace PlayniteGameOverlay
 {
@@ -81,6 +83,11 @@ namespace PlayniteGameOverlay
             // Initialize global keyboard hook
             keyboardHook = new GlobalKeyboardHook();
             keyboardHook.KeyPressed += OnKeyPressed;
+            InitializeController();
+            if (controllerTimer != null)
+            {
+                controllerTimer.Stop();
+        }
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -90,6 +97,13 @@ namespace PlayniteGameOverlay
             // Cleanup resources
             overlayWindow?.Close();
             keyboardHook?.Dispose();
+            // Clean up SDL
+            if (sdlInitialized)
+            {
+                SDL.SDL_Quit();
+                sdlInitialized = false;
+        }
+            CloseController();
         }
 
         private void OnKeyPressed(Keys key, bool altPressed)
@@ -126,6 +140,10 @@ namespace PlayniteGameOverlay
                 gameStarted = DateTime.Now;
                 var gameOverlayData = CreateGameOverlayData(args.Game, args.StartedProcessId, gameStarted);
                 overlayWindow.UpdateGameOverlay(gameOverlayData);
+                if (controllerTimer != null)
+                {
+                    controllerTimer.Start();
+            }
             }
             catch (Exception ex)
             {
@@ -136,6 +154,10 @@ namespace PlayniteGameOverlay
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
             overlayWindow.UpdateGameOverlay(null);
+            if (controllerTimer != null)
+            {
+                controllerTimer.Stop();
+        }
         }
 
         private void ShowGameOverlay(Game game)
@@ -488,6 +510,142 @@ namespace PlayniteGameOverlay
 
             return achievements;
         }
+
+        #region SDL2
+        private IntPtr controller = IntPtr.Zero;
+
+        private bool sdlInitialized = false;
+        private int controllerId = -1;
+        private DispatcherTimer controllerTimer;
+
+        private void InitializeController()
+        {
+            try
+            {
+                log("Initializing SDL controller support", "SDL_GLOBAL");
+
+                // Initialize SDL with game controller support
+                if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER) < 0)
+                {
+                    string error = SDL.SDL_GetError();
+                    log($"SDL_GLOBAL could not initialize! SDL Error: {error}", "SDL_GLOBAL_ERROR");
+                    return;
+                }
+
+                sdlInitialized = true;
+                log("SDL_GLOBAL initialized successfully", "SDL_GLOBAL");
+
+                // Look for connected controllers
+                int numJoysticks = SDL.SDL_NumJoysticks();
+                log($"Found {numJoysticks} joysticks/controllers", "SDL_GLOBAL");
+
+                // Try to find a connected compatible controller
+                for (int i = 0; i < numJoysticks; i++)
+                {
+                    if (SDL.SDL_IsGameController(i) == SDL.SDL_bool.SDL_TRUE)
+                    {
+                        controllerId = i;
+                        log($"Found compatible game controller at index {i}", "SDL_GLOBAL");
+
+                        // Open the controller here, and keep it open
+                        controller = SDL.SDL_GameControllerOpen(controllerId);
+                        if (controller == IntPtr.Zero)
+                        {
+                            log($"Could not open controller! SDL Error: {SDL.SDL_GetError()}", "SDL_GLOBAL_ERROR");
+                            return;
+                        }
+
+                        // Optional: Log controller mapping
+                        string mapping = SDL.SDL_GameControllerMapping(controller);
+                        log($"Controller mapping: {mapping}", "SDL_GLOBAL_DEBUG");
+
+                        break;
+                    }
+                }
+
+                if (controllerId == -1)
+                {
+                    log("No compatible game controllers found", "SDL_GLOBAL");
+                    return;
+                }
+
+                // Set up controller polling timer (poll @ 60Hz)
+                log("Setting up controller polling timer", "SDL_GLOBAL");
+                controllerTimer = new DispatcherTimer();
+                controllerTimer.Interval = TimeSpan.FromMilliseconds(16.67);
+                controllerTimer.Tick += PollControllerInput;
+                controllerTimer.Start();
+                log("Controller polling timer started", "SDL_GLOBAL");
+            }
+            catch (Exception ex)
+            {
+                log($"Error initializing SDL: {ex.Message}", "SDL_GLOBAL_ERROR");
+                log($"Stack trace: {ex.StackTrace}", "SDL_GLOBAL_ERROR");
+            }
+        }
+
+        private void CloseController()
+        {
+            if (controller != IntPtr.Zero)
+            {
+                SDL.SDL_GameControllerClose(controller);
+                controller = IntPtr.Zero;
+                log("Controller closed", "SDL_GLOBAL");
+            }
+        }
+
+        private void PollControllerInput(object sender, EventArgs e)
+        {
+            // Ensure that the controller is initialized and opened
+            if (controller == IntPtr.Zero)
+            {
+                log("Controller not open, skipping polling", "SDL_GLOBAL");
+                return;
+                }
+
+            // Process SDL events (optional, but can be useful for other input events)
+            SDL.SDL_Event sdlEvent;
+            while (SDL.SDL_PollEvent(out sdlEvent) != 0)
+            {
+                log($"SDL_GLOBAL event type: {sdlEvent.type}", "SDL_GLOBAL_EVENT");
+
+                // You can add handling for other event types if needed, such as controller device additions/removals
+                if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEADDED)
+                {
+                    log($"Controller device added: {sdlEvent.cdevice.which}", "SDL_GLOBAL_EVENT");
+                }
+                else if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEREMOVED)
+                {
+                    log($"Controller device removed: {sdlEvent.cdevice.which}", "SDL_GLOBAL_EVENT");
+                }
+            }
+
+            // Update the controller's state (fetch input states like button presses, axis movements, etc.)
+            SDL.SDL_GameControllerUpdate();
+
+            // Check if the A button is pressed (used for selection)
+            bool startPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_START) == 1;
+
+            // Check if the B button is pressed (used for hiding the overlay)
+            bool backPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_BACK) == 1;
+
+            if (startPressed && backPressed)
+            {
+                var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+                if (runningGame != null)
+                {
+                    if (overlayWindow.IsVisible)
+                        overlayWindow.Hide();
+                    else
+                        ShowGameOverlay(runningGame);
+                } else
+                {
+                    log("No running game found to show overlay", "WARNING");
+                }
+            }
+        }
+
+        #endregion
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
