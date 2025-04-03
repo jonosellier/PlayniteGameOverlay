@@ -46,7 +46,7 @@
         <CheckBox IsChecked="{Binding DebugMode}" 
                   Content="Enable Debug Mode" 
                   Margin="0,10,0,5"/>
-        <TextBlock Text="Shows additional debugging information in the overlay" 
+        <TextBlock Text="Shows additional debugging information in the overlay. Useful if a game is not able to be exited. Also causes the overlay to output a LOAD of logs to the debugger console." 
                    Margin="0,0,0,15"
                    Foreground="#888888"/>
     </StackPanel>
