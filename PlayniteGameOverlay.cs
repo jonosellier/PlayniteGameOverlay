@@ -76,7 +76,7 @@ namespace PlayniteGameOverlay
             CheckSuccessStoryAvailability();
 
             // Initialize overlay window
-            overlayWindow = new OverlayWindow();
+            overlayWindow = new OverlayWindow(Settings.DebugMode);
             overlayWindow.Hide();
 
             // Set up show Playnite handler
@@ -571,10 +571,10 @@ namespace PlayniteGameOverlay
                     return;
                 }
 
-                // Set up controller polling timer (poll @ 60Hz)
+                // Set up controller polling timer (poll @ 120Hz)
                 log("Setting up controller polling timer", "SDL_GLOBAL");
                 controllerTimer = new DispatcherTimer();
-                controllerTimer.Interval = TimeSpan.FromMilliseconds(16.67);
+                controllerTimer.Interval = TimeSpan.FromMilliseconds(8);
                 controllerTimer.Tick += PollControllerInput;
                 controllerTimer.Start();
                 log("Controller polling timer started", "SDL_GLOBAL");

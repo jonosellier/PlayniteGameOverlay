@@ -43,9 +43,11 @@ namespace PlayniteGameOverlay
 
         private const int DEBOUNCE_THRESHOLD = 100; // 100 milliseconds debounce threshold
 
-        public OverlayWindow()
+        public OverlayWindow(bool debug = false)
         {
             InitializeComponent();
+
+            IS_DEBUG = debug;
 
             // Set the window to fullscreen
             // Set the window to fullscreen
@@ -301,16 +303,23 @@ namespace PlayniteGameOverlay
 
         private void UpdateDebugInfo(GameOverlayData gameData)
         {
-            if (gameData == null)
-            {
-                ProcessInfo_DEBUG.Text = "No active game";
-                return;
-            }
+            if (IS_DEBUG)
+            { 
+                ProcessInfo_DEBUG.Visibility = Visibility.Visible;
+                if (gameData == null)
+                {
+                    ProcessInfo_DEBUG.Text = "No active game";
+                    return;
+                }
 
-            ProcessInfo_DEBUG.Text = $"DEBUG INFO:\n" +
-                $"Game: {gameData.GameName}\n" +
-                $"PID: {gameData.ProcessId}\n" +
-                $"Start Time: {gameData.GameStartTime}";
+                ProcessInfo_DEBUG.Text = $"DEBUG INFO:\n" +
+                    $"Game: {gameData.GameName}\n" +
+                    $"PID: {gameData.ProcessId}\n" +
+                    $"Start Time: {gameData.GameStartTime}";
+            } else
+            {
+                ProcessInfo_DEBUG.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void ResetGameDisplay()
@@ -472,10 +481,10 @@ namespace PlayniteGameOverlay
                     return;
                 }
 
-                // Set up controller polling timer (poll @ 60Hz)
+                // Set up controller polling timer (poll @ 120Hz)
                 log("Setting up controller polling timer", "SDL");
                 controllerTimer = new DispatcherTimer();
-                controllerTimer.Interval = TimeSpan.FromMilliseconds(16.67);
+                controllerTimer.Interval = TimeSpan.FromMilliseconds(8);
                 controllerTimer.Tick += PollControllerInput;
                 controllerTimer.Start();
                 log("Controller polling timer started", "SDL");
@@ -559,6 +568,11 @@ namespace PlayniteGameOverlay
             {
                 log($"Controller input: Up:{moveUp} Down:{moveDown} Left:{moveLeft} Right:{moveRight} A:{aPressed} B:{bPressed}", "SDL_INPUT");
             }
+
+            if (!moveUp) lastUpTime = DateTime.MinValue;
+            if (!moveDown) lastDownTime = DateTime.MinValue;
+            if (!moveLeft) lastLeftTime = DateTime.MinValue;
+            if (!moveRight) lastRightTime = DateTime.MinValue;
 
 
             // Debounce the navigation actions
