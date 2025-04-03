@@ -13,6 +13,8 @@ using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using SDL2;
 using System.Windows.Threading;
+using System.Runtime;
+using System.ComponentModel;
 
 namespace PlayniteGameOverlay
 {
@@ -20,7 +22,7 @@ namespace PlayniteGameOverlay
     {
         private static readonly ILogger logger = LogManager.GetLogger();
 
-        private const bool IS_DEBUG = true;
+        private OverlaySettings settings;
 
         private OverlayWindow overlayWindow;
         private IPlayniteAPI playniteAPI;
@@ -63,7 +65,7 @@ namespace PlayniteGameOverlay
         public PlayniteGameOverlay(IPlayniteAPI api) : base(api)
         {
             playniteAPI = api;
-            Properties = new GenericPluginProperties { HasSettings = false };
+            Properties = new GenericPluginProperties { HasSettings = true };
         }
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
@@ -87,7 +89,7 @@ namespace PlayniteGameOverlay
             if (controllerTimer != null)
             {
                 controllerTimer.Stop();
-        }
+            }
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -102,7 +104,7 @@ namespace PlayniteGameOverlay
             {
                 SDL.SDL_Quit();
                 sdlInitialized = false;
-        }
+            }
             CloseController();
         }
 
@@ -143,7 +145,7 @@ namespace PlayniteGameOverlay
                 if (controllerTimer != null)
                 {
                     controllerTimer.Start();
-            }
+                }
             }
             catch (Exception ex)
             {
@@ -157,7 +159,7 @@ namespace PlayniteGameOverlay
             if (controllerTimer != null)
             {
                 controllerTimer.Stop();
-        }
+            }
         }
 
         private void ShowGameOverlay(Game game)
@@ -421,7 +423,7 @@ namespace PlayniteGameOverlay
 
         private void log(string msg, string tag = "DEBUG")
         {
-            if (IS_DEBUG)
+            if (Settings.DebugMode)
             {
                 Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
             }
@@ -601,7 +603,7 @@ namespace PlayniteGameOverlay
             {
                 log("Controller not open, skipping polling", "SDL_GLOBAL");
                 return;
-                }
+            }
 
             // Process SDL events (optional, but can be useful for other input events)
             SDL.SDL_Event sdlEvent;
@@ -629,7 +631,12 @@ namespace PlayniteGameOverlay
             // Check if the B button is pressed (used for hiding the overlay)
             bool backPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_BACK) == 1;
 
-            if (startPressed && backPressed)
+            bool guidePressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_GUIDE) == 1;
+
+            if (
+                (Settings.ControllerShortcut == ControllerShortcut.StartBack && startPressed && backPressed)
+                || (Settings.ControllerShortcut == ControllerShortcut.Guide && guidePressed)
+                )
             {
                 var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
                 if (runningGame != null)
@@ -645,6 +652,38 @@ namespace PlayniteGameOverlay
             }
         }
 
+        #endregion
+
+
+        #region Settings
+        public override ISettings GetSettings(bool firstRunSettings)
+        {
+            if (settings == null)
+            {
+                settings = new OverlaySettings(this);
+            }
+
+            return settings;
+        }
+
+        public override System.Windows.Controls.UserControl GetSettingsView(bool firstRunSettings)
+        {
+            return new OverlaySettingsView();
+        }
+
+        // You might also want to add a public property to easily access settings
+        public OverlaySettings Settings
+        {
+            get
+            {
+                if (settings == null)
+                {
+                    settings = (OverlaySettings)GetSettings(false);
+                }
+
+                return settings;
+            }
+        }
         #endregion
 
         [DllImport("user32.dll")]
@@ -705,5 +744,85 @@ namespace PlayniteGameOverlay
 
         [JsonPropertyName("UrlLocked")]
         public string UrlLocked { get; set; }
+    }
+
+    public class OverlaySettings : ObservableObject, ISettings
+    {
+        private readonly Plugin plugin;
+
+        // Using properties with setters that notify of changes
+        private ControllerShortcut _controllerShortcut = ControllerShortcut.StartBack;
+        private bool _debugMode = false;
+
+        public ControllerShortcut ControllerShortcut
+        {
+            get => _controllerShortcut;
+            set => SetValue(ref _controllerShortcut, value);
+        }
+
+        public bool DebugMode
+        {
+            get => _debugMode;
+            set => SetValue(ref _debugMode, value);
+        }
+
+        // Backup values for cancel operation
+        private ControllerShortcut _controllerShortcutBackup;
+        private bool _debugModeBackup;
+
+        // Parameterless constructor needed for serialization
+        public OverlaySettings()
+        {
+        }
+
+        // Main constructor that loads saved settings
+        public OverlaySettings(Plugin plugin)
+        {
+            this.plugin = plugin;
+
+            // Load saved settings
+            var savedSettings = plugin.LoadPluginSettings<OverlaySettings>();
+            if (savedSettings != null)
+            {
+                ControllerShortcut = savedSettings.ControllerShortcut;
+                DebugMode = savedSettings.DebugMode;
+            }
+        }
+
+        public void BeginEdit()
+        {
+            // Backup current values in case user cancels
+            _controllerShortcutBackup = ControllerShortcut;
+            _debugModeBackup = DebugMode;
+        }
+
+        public void CancelEdit()
+        {
+            // Restore from backup
+            ControllerShortcut = _controllerShortcutBackup;
+            DebugMode = _debugModeBackup;
+        }
+
+        public void EndEdit()
+        {
+            // Save settings to persistent storage
+            plugin.SavePluginSettings(this);
+        }
+
+        public bool VerifySettings(out List<string> errors)
+        {
+            errors = new List<string>();
+            // Add any validation logic here if needed
+            return true;
+        }
+    }
+
+    public enum ControllerShortcut
+    {
+        [Description("View + Menu (Back + Start)")]
+        StartBack,
+
+        [Description("Xbox Button (Guide Button)")]
+        Guide
     }
 }
