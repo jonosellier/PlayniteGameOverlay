@@ -1,0 +1,53 @@
+﻿<UserControl x:Class="PlayniteGameOverlay.OverlaySettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:PlayniteGameOverlay" xmlns:System="clr-namespace:System;assembly=mscorlib">
+
+    <UserControl.Resources>
+        <ObjectDataProvider x:Key="ControllerShortcutEnum" 
+                            MethodName="GetValues" 
+                            ObjectType="{x:Type System:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="local:ControllerShortcut"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+        <local:EnumDescriptionConverter x:Key="EnumDescriptionConverter" />
+    </UserControl.Resources>
+
+    <StackPanel Margin="20">
+        <TextBlock Text="Game Overlay Settings" 
+                   FontWeight="Bold" 
+                   FontSize="16" 
+                   Margin="0,0,0,15"/>
+
+        <TextBlock Text="Controller Shortcut:" 
+                   Margin="0,0,0,5"/>
+        <ComboBox ItemsSource="{Binding Source={StaticResource ControllerShortcutEnum}}"
+          SelectedItem="{Binding ControllerShortcut}"
+          Width="270"
+          HorizontalAlignment="Left"
+          Margin="0,0,0,15">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock>
+                        <TextBlock.Text>
+                            <Binding Path="." Converter="{StaticResource EnumDescriptionConverter}" />
+                        </TextBlock.Text>
+                    </TextBlock>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Text="Note for using Guide Button for controller activation: Ensure you disable Guide Button detection in all other programs. Check Steam and Xbox GameBar settings and inside playnite, disable 'Show Playnite When Guide Button is Pressed'" TextWrapping="Wrap"
+           Margin="0,0,0,20" Foreground="#888888" />
+        <TextBlock Text="Note: The keyboard shortcut is Alt + Backtick" 
+           Margin="0,0,0,20" Foreground="#888888"/>
+        <CheckBox IsChecked="{Binding DebugMode}" 
+                  Content="Enable Debug Mode" 
+                  Margin="0,10,0,5"/>
+        <TextBlock Text="Shows additional debugging information in the overlay. Useful if a game is not able to be exited. Also causes the overlay to output a LOAD of logs to the debugger console." 
+                   Margin="0,0,0,15"
+                   Foreground="#888888"/>
+    </StackPanel>
+</UserControl>

@@ -11,6 +11,10 @@ using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
+using SDL2;
+using System.Windows.Threading;
+using System.Runtime;
+using System.ComponentModel;
 
 namespace PlayniteGameOverlay
 {
@@ -18,7 +22,7 @@ namespace PlayniteGameOverlay
     {
         private static readonly ILogger logger = LogManager.GetLogger();
 
-        private const bool IS_DEBUG = true;
+        private OverlaySettings settings;
 
         private OverlayWindow overlayWindow;
         private IPlayniteAPI playniteAPI;
@@ -61,7 +65,7 @@ namespace PlayniteGameOverlay
         public PlayniteGameOverlay(IPlayniteAPI api) : base(api)
         {
             playniteAPI = api;
-            Properties = new GenericPluginProperties { HasSettings = false };
+            Properties = new GenericPluginProperties { HasSettings = true };
         }
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
@@ -72,7 +76,7 @@ namespace PlayniteGameOverlay
             CheckSuccessStoryAvailability();
 
             // Initialize overlay window
-            overlayWindow = new OverlayWindow();
+            overlayWindow = new OverlayWindow(Settings.DebugMode);
             overlayWindow.Hide();
 
             // Set up show Playnite handler
@@ -81,6 +85,11 @@ namespace PlayniteGameOverlay
             // Initialize global keyboard hook
             keyboardHook = new GlobalKeyboardHook();
             keyboardHook.KeyPressed += OnKeyPressed;
+            InitializeController();
+            if (controllerTimer != null)
+            {
+                controllerTimer.Stop();
+            }
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -90,6 +99,13 @@ namespace PlayniteGameOverlay
             // Cleanup resources
             overlayWindow?.Close();
             keyboardHook?.Dispose();
+            // Clean up SDL
+            if (sdlInitialized)
+            {
+                SDL.SDL_Quit();
+                sdlInitialized = false;
+            }
+            CloseController();
         }
 
         private void OnKeyPressed(Keys key, bool altPressed)
@@ -126,6 +142,10 @@ namespace PlayniteGameOverlay
                 gameStarted = DateTime.Now;
                 var gameOverlayData = CreateGameOverlayData(args.Game, args.StartedProcessId, gameStarted);
                 overlayWindow.UpdateGameOverlay(gameOverlayData);
+                if (controllerTimer != null)
+                {
+                    controllerTimer.Start();
+                }
             }
             catch (Exception ex)
             {
@@ -136,6 +156,10 @@ namespace PlayniteGameOverlay
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
             overlayWindow.UpdateGameOverlay(null);
+            if (controllerTimer != null)
+            {
+                controllerTimer.Stop();
+            }
         }
 
         private void ShowGameOverlay(Game game)
@@ -399,7 +423,7 @@ namespace PlayniteGameOverlay
 
         private void log(string msg, string tag = "DEBUG")
         {
-            if (IS_DEBUG)
+            if (Settings.DebugMode)
             {
                 Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
             }
@@ -489,6 +513,179 @@ namespace PlayniteGameOverlay
             return achievements;
         }
 
+        #region SDL2
+        private IntPtr controller = IntPtr.Zero;
+
+        private bool sdlInitialized = false;
+        private int controllerId = -1;
+        private DispatcherTimer controllerTimer;
+
+        private void InitializeController()
+        {
+            try
+            {
+                log("Initializing SDL controller support", "SDL_GLOBAL");
+
+                // Initialize SDL with game controller support
+                if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER) < 0)
+                {
+                    string error = SDL.SDL_GetError();
+                    log($"SDL_GLOBAL could not initialize! SDL Error: {error}", "SDL_GLOBAL_ERROR");
+                    return;
+                }
+
+                sdlInitialized = true;
+                log("SDL_GLOBAL initialized successfully", "SDL_GLOBAL");
+
+                // Look for connected controllers
+                int numJoysticks = SDL.SDL_NumJoysticks();
+                log($"Found {numJoysticks} joysticks/controllers", "SDL_GLOBAL");
+
+                // Try to find a connected compatible controller
+                for (int i = 0; i < numJoysticks; i++)
+                {
+                    if (SDL.SDL_IsGameController(i) == SDL.SDL_bool.SDL_TRUE)
+                    {
+                        controllerId = i;
+                        log($"Found compatible game controller at index {i}", "SDL_GLOBAL");
+
+                        // Open the controller here, and keep it open
+                        controller = SDL.SDL_GameControllerOpen(controllerId);
+                        if (controller == IntPtr.Zero)
+                        {
+                            log($"Could not open controller! SDL Error: {SDL.SDL_GetError()}", "SDL_GLOBAL_ERROR");
+                            return;
+                        }
+
+                        // Optional: Log controller mapping
+                        string mapping = SDL.SDL_GameControllerMapping(controller);
+                        log($"Controller mapping: {mapping}", "SDL_GLOBAL_DEBUG");
+
+                        break;
+                    }
+                }
+
+                if (controllerId == -1)
+                {
+                    log("No compatible game controllers found", "SDL_GLOBAL");
+                    return;
+                }
+
+                // Set up controller polling timer (poll @ 120Hz)
+                log("Setting up controller polling timer", "SDL_GLOBAL");
+                controllerTimer = new DispatcherTimer();
+                controllerTimer.Interval = TimeSpan.FromMilliseconds(8);
+                controllerTimer.Tick += PollControllerInput;
+                controllerTimer.Start();
+                log("Controller polling timer started", "SDL_GLOBAL");
+            }
+            catch (Exception ex)
+            {
+                log($"Error initializing SDL: {ex.Message}", "SDL_GLOBAL_ERROR");
+                log($"Stack trace: {ex.StackTrace}", "SDL_GLOBAL_ERROR");
+            }
+        }
+
+        private void CloseController()
+        {
+            if (controller != IntPtr.Zero)
+            {
+                SDL.SDL_GameControllerClose(controller);
+                controller = IntPtr.Zero;
+                log("Controller closed", "SDL_GLOBAL");
+            }
+        }
+
+        private void PollControllerInput(object sender, EventArgs e)
+        {
+            // Ensure that the controller is initialized and opened
+            if (controller == IntPtr.Zero)
+            {
+                log("Controller not open, skipping polling", "SDL_GLOBAL");
+                return;
+            }
+
+            // Process SDL events (optional, but can be useful for other input events)
+            SDL.SDL_Event sdlEvent;
+            while (SDL.SDL_PollEvent(out sdlEvent) != 0)
+            {
+                log($"SDL_GLOBAL event type: {sdlEvent.type}", "SDL_GLOBAL_EVENT");
+
+                // You can add handling for other event types if needed, such as controller device additions/removals
+                if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEADDED)
+                {
+                    log($"Controller device added: {sdlEvent.cdevice.which}", "SDL_GLOBAL_EVENT");
+                }
+                else if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEREMOVED)
+                {
+                    log($"Controller device removed: {sdlEvent.cdevice.which}", "SDL_GLOBAL_EVENT");
+                }
+            }
+
+            // Update the controller's state (fetch input states like button presses, axis movements, etc.)
+            SDL.SDL_GameControllerUpdate();
+
+            // Check if the A button is pressed (used for selection)
+            bool startPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_START) == 1;
+
+            // Check if the B button is pressed (used for hiding the overlay)
+            bool backPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_BACK) == 1;
+
+            bool guidePressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_GUIDE) == 1;
+
+            if (
+                (Settings.ControllerShortcut == ControllerShortcut.StartBack && startPressed && backPressed)
+                || (Settings.ControllerShortcut == ControllerShortcut.Guide && guidePressed)
+                )
+            {
+                var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+                if (runningGame != null)
+                {
+                    if (overlayWindow.IsVisible)
+                        overlayWindow.Hide();
+                    else
+                        ShowGameOverlay(runningGame);
+                } else
+                {
+                    log("No running game found to show overlay", "WARNING");
+                }
+            }
+        }
+
+        #endregion
+
+
+        #region Settings
+        public override ISettings GetSettings(bool firstRunSettings)
+        {
+            if (settings == null)
+            {
+                settings = new OverlaySettings(this);
+            }
+
+            return settings;
+        }
+
+        public override System.Windows.Controls.UserControl GetSettingsView(bool firstRunSettings)
+        {
+            return new OverlaySettingsView();
+        }
+
+        // You might also want to add a public property to easily access settings
+        public OverlaySettings Settings
+        {
+            get
+            {
+                if (settings == null)
+                {
+                    settings = (OverlaySettings)GetSettings(false);
+                }
+
+                return settings;
+            }
+        }
+        #endregion
+
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -547,5 +744,85 @@ namespace PlayniteGameOverlay
 
         [JsonPropertyName("UrlLocked")]
         public string UrlLocked { get; set; }
+    }
+
+    public class OverlaySettings : ObservableObject, ISettings
+    {
+        private readonly Plugin plugin;
+
+        // Using properties with setters that notify of changes
+        private ControllerShortcut _controllerShortcut = ControllerShortcut.StartBack;
+        private bool _debugMode = false;
+
+        public ControllerShortcut ControllerShortcut
+        {
+            get => _controllerShortcut;
+            set => SetValue(ref _controllerShortcut, value);
+        }
+
+        public bool DebugMode
+        {
+            get => _debugMode;
+            set => SetValue(ref _debugMode, value);
+        }
+
+        // Backup values for cancel operation
+        private ControllerShortcut _controllerShortcutBackup;
+        private bool _debugModeBackup;
+
+        // Parameterless constructor needed for serialization
+        public OverlaySettings()
+        {
+        }
+
+        // Main constructor that loads saved settings
+        public OverlaySettings(Plugin plugin)
+        {
+            this.plugin = plugin;
+
+            // Load saved settings
+            var savedSettings = plugin.LoadPluginSettings<OverlaySettings>();
+            if (savedSettings != null)
+            {
+                ControllerShortcut = savedSettings.ControllerShortcut;
+                DebugMode = savedSettings.DebugMode;
+            }
+        }
+
+        public void BeginEdit()
+        {
+            // Backup current values in case user cancels
+            _controllerShortcutBackup = ControllerShortcut;
+            _debugModeBackup = DebugMode;
+        }
+
+        public void CancelEdit()
+        {
+            // Restore from backup
+            ControllerShortcut = _controllerShortcutBackup;
+            DebugMode = _debugModeBackup;
+        }
+
+        public void EndEdit()
+        {
+            // Save settings to persistent storage
+            plugin.SavePluginSettings(this);
+        }
+
+        public bool VerifySettings(out List<string> errors)
+        {
+            errors = new List<string>();
+            // Add any validation logic here if needed
+            return true;
+        }
+    }
+
+    public enum ControllerShortcut
+    {
+        [Description("View + Menu (Back + Start)")]
+        StartBack,
+
+        [Description("Xbox Button (Guide Button)")]
+        Guide
     }
 }
