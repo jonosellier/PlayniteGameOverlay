@@ -9,6 +9,12 @@ using System.Linq;
 using SDL2;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Collections.ObjectModel;
+using System.Windows.Controls;
+using Orientation = System.Windows.Controls.Orientation;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using System.Windows.Media;
+using System.Threading;
 
 namespace PlayniteGameOverlay
 {
@@ -23,6 +29,8 @@ namespace PlayniteGameOverlay
                 Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
             }
         }
+
+        public ICommand ButtonCommand { get; set; }
 
         private readonly DispatcherTimer clockTimer;
         private DispatcherTimer batteryUpdateTimer;
@@ -43,7 +51,7 @@ namespace PlayniteGameOverlay
 
         private const int DEBOUNCE_THRESHOLD = 100; // 100 milliseconds debounce threshold
 
-        public OverlayWindow(bool debug = false)
+        public OverlayWindow(ButtonItem[] buttons, bool debug = false)
         {
             InitializeComponent();
 
@@ -73,6 +81,319 @@ namespace PlayniteGameOverlay
 
             // Set initial focus to first button
             ReturnToGameButton.Focus();
+            ShortcutButtons = new ObservableCollection<ButtonItem>(buttons);
+            CreateButtons();
+        }
+
+        public ObservableCollection<ButtonItem> ShortcutButtons;
+
+        private void CreateButtons()
+        {
+
+            var hoverBrush = (SolidColorBrush)new BrushConverter().ConvertFrom("#FF363636");
+            var bgBrush = new SolidColorBrush(Colors.Transparent);
+
+            // Create a WrapPanel to hold the buttons inside the border
+            WrapPanel buttonPanel = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            ShortcutBar.Child = buttonPanel;
+
+            foreach (var (buttonItem, idx) in ShortcutButtons.Select((value, i) => (value, i)))
+            {
+
+                log("---- ButtonItem ----");
+                log($"Title:      {buttonItem.Title}");
+                log($"ActionType: {buttonItem.ActionType}");
+                log($"Path:       {buttonItem.Path}");
+                log($"IconPath:   {buttonItem.IconPath}");
+
+                // Create a Grid for layering the label over the button
+                Grid buttonGrid = new Grid
+                {
+                    Width = 64,
+                    Height = 56,
+                    Margin = idx == 0 ? new Thickness(4, -4, 4, 4) : new Thickness(16, -4, 4, 4)
+                };
+
+                // Create the button with image
+                System.Windows.Controls.Button btn = new System.Windows.Controls.Button
+                {
+                    Width = 48,
+                    Height = 48,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    ToolTip = buttonItem.Title,
+                    Padding = new Thickness(0),
+                    Background = bgBrush,
+                    Margin = new Thickness(0, 0, 0, 0)
+                };
+
+                // Add image to button
+                Image img = new Image
+                {
+                    Source = new BitmapImage(new Uri(buttonItem.IconPath, UriKind.RelativeOrAbsolute)),
+                    Width = 40,
+                    Height = 40,
+                    Margin = new Thickness(4)
+                };
+                btn.Content = img;
+
+                // Create a border with rounded corners for text background
+                Border textBorder = new Border
+                {
+                    Background = (SolidColorBrush)new BrushConverter().ConvertFrom("#FF363636"),
+                    BorderBrush = (SolidColorBrush)new BrushConverter().ConvertFrom("#80808080"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(4, 2, 4, 2),
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(0, -20, 0, 10),
+                    Visibility = Visibility.Collapsed // Hidden by default
+                };
+
+                // Create text label with white color
+                TextBlock txt = new TextBlock
+                {
+                    Text = buttonItem.Title,
+                    TextAlignment = TextAlignment.Center,
+                    TextWrapping = TextWrapping.NoWrap, // Allow multi-line wrapping
+                    FontSize = 10,
+                    Foreground = (SolidColorBrush)new BrushConverter().ConvertFrom("#FFD0D0D0"),
+                    MinWidth = 48,  // Allow expansion beyond button
+                    MaxWidth = 200, // Adjust this based on preference
+                    TextTrimming = TextTrimming.CharacterEllipsis // Optional: Prevent overflow issues
+
+                };
+
+                textBorder.MinWidth = txt.MinWidth;
+                textBorder.MaxWidth = txt.MaxWidth;
+                textBorder.Child = txt;
+
+
+                // Add hover/focus events to show/hide label
+                btn.MouseEnter += (sender, e) => {
+                    textBorder.Visibility = Visibility.Visible;
+                    btn.Background = hoverBrush;
+                };
+                btn.MouseLeave += (sender, e) => {
+                    textBorder.Visibility = Visibility.Collapsed;
+                    btn.Background = bgBrush;
+                };
+                btn.GotFocus += (sender, e) => {
+                    textBorder.Visibility = Visibility.Visible;
+                    btn.Background = hoverBrush;
+                };
+                btn.LostFocus += (sender, e) => { 
+                    textBorder.Visibility = Visibility.Collapsed;
+                    btn.Background = bgBrush;
+                };
+
+                // Add click handler
+                btn.Click += (sender, e) => Button_Click(sender, e, buttonItem);
+
+                // Add elements to grid
+                buttonGrid.Children.Add(btn);     // Button at the bottom
+                buttonGrid.Children.Add(textBorder); // Text floats above
+
+                // Add the grid to panel
+                buttonPanel.Children.Add(buttonGrid);
+            }
+        }
+
+        private void Button_Click(object sender, RoutedEventArgs e, ButtonItem buttonItem)
+        {
+            // Handle button click based on ActionType
+            try
+            {
+                switch (buttonItem.ActionType)
+                {
+                    case ButtonAction.Directory:
+                        // Check if the folder is already open in Explorer
+                        bool folderFound = IsFolderOpen(buttonItem.Path);
+
+                        if (folderFound)
+                        {
+                            // Folder is already open, focus was handled in the IsFolderOpen method
+                        }
+                        else
+                        {
+                            // Open the folder in a new Explorer window
+                            System.Diagnostics.Process.Start("explorer.exe", buttonItem.Path);
+                        }
+                        break;
+                    case ButtonAction.Executable:
+                        // Get the filename without path
+                        string fileName = System.IO.Path.GetFileName(buttonItem.Path);
+
+                        // Try to find a running process with this name
+                        bool processFound = false;
+
+                        try
+                        {
+                            // Get all processes with the same name (without extension)
+                            string processName = System.IO.Path.GetFileNameWithoutExtension(fileName);
+                            System.Diagnostics.Process[] processes = System.Diagnostics.Process.GetProcessesByName(processName);
+
+                            if (processes.Length > 0)
+                            {
+                                processFound = true;
+
+                                // Try to bring the window to the foreground
+                                foreach (var process in processes)
+                                {
+                                    try
+                                    {
+                                        // Get the main window handle
+                                        IntPtr handle = process.MainWindowHandle;
+
+                                        if (handle != IntPtr.Zero)
+                                        {
+                                            // Restore window if minimized
+                                            ShowWindow(handle, SW_MAXIMIZE);
+
+                                            // Bring to foreground
+                                            SetForegroundWindow(handle);
+
+                                            break; // Exit after focusing the first valid window
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        // Continue to the next process if this one fails
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Error checking for existing process: {ex.Message}");
+                        }
+
+                        // If no running process was found or focused, start a new one
+                        if (!processFound)
+                        {
+                            System.Diagnostics.Process.Start(buttonItem.Path);
+                        }
+                        break;
+                    case ButtonAction.Uri:
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = buttonItem.Path,
+                            UseShellExecute = true
+                        });
+                        break;
+                    case ButtonAction.KeyboardShortcut:
+                        Hide(); // Hide the overlay before shortcut
+                        Thread.Sleep(1500);
+                        ExecuteShortcut(buttonItem.Path);
+                        break;
+                    case ButtonAction.Shortcut:
+                        // Check if the shortcut is a valid executable
+                        if (System.IO.File.Exists(buttonItem.Path))
+                        {
+                            var startInfo = new ProcessStartInfo
+                            {
+                                FileName = buttonItem.Path,
+                                UseShellExecute = true, // Ensures the system handles the .lnk properly
+                            };
+
+                            // Ensure the path is correctly quoted in case it has spaces
+                            if (buttonItem.Path.Contains(" "))
+                            {
+                                startInfo.Arguments = $"\"{buttonItem.Path}\"";
+                            }
+
+                            Process.Start(startInfo);
+                        }
+                        else
+                        {
+                            log($"Shortcut not found: {buttonItem.Path}", "SHORTCUT_ERROR");
+                        }
+                        break;
+                }
+
+                Hide(); // Hide the overlay after button click
+            }
+            catch (Exception ex)
+            {
+                log($"Error executing button action: {ex.Message}\n\n {buttonItem.Path}", "BUTTON_ERROR");
+            }
+        }
+
+        private bool IsFolderOpen(string folderPath)
+        {
+            try
+            {
+                // Normalize path for comparison (ensure it ends with backslash)
+                folderPath = System.IO.Path.GetFullPath(folderPath);
+                if (!folderPath.EndsWith("\\"))
+                    folderPath += "\\";
+
+                // Get Shell application object
+                Type shellAppType = Type.GetTypeFromProgID("Shell.Application");
+                dynamic shellApp = Activator.CreateInstance(shellAppType);
+
+                // Get all open Explorer windows
+                var windows = shellApp.Windows();
+
+                for (int i = 0; i < windows.Count; i++)
+                {
+                    try
+                    {
+                        var window = windows.Item(i);
+
+                        // Skip non-Explorer windows
+                        if (window.Name != "Windows Explorer" && window.Name != "File Explorer")
+                            continue;
+
+                        // Get the location of this window
+                        string location = null;
+                        try
+                        {
+                            var document = window.Document;
+                            location = document.Folder.Self.Path;
+
+                            // Normalize for comparison
+                            location = System.IO.Path.GetFullPath(location);
+                            if (!location.EndsWith("\\"))
+                                location += "\\";
+                        }
+                        catch
+                        {
+                            continue; // Skip if we can't get the location
+                        }
+
+                        // If this window shows our folder, activate it
+                        if (string.Equals(location, folderPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Activate the window
+                            window.Visible = true;
+                            window.Activate();
+
+                            // Maximize the window if needed
+                            IntPtr hwnd = new IntPtr(window.HWND);
+                            ShowWindow(hwnd, SW_MAXIMIZE);
+
+                            return true;
+                        }
+                    }
+                    catch
+                    {
+                        // Skip this window if there's an error
+                        continue;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking for open folder: {ex.Message}");
+            }
+
+            return false;
         }
 
         private void OverlayWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -707,6 +1028,34 @@ namespace PlayniteGameOverlay
         }
         #endregion
 
+        private void ExecuteShortcut(string keyCodes)
+        {
+            var keys = keyCodes.Split(' ').Select(k => Convert.ToUInt16(k, 16)).ToArray();
+            Input[] inputs = new Input[keys.Length * 2];
+
+            // Press modifier keys first
+            for (int i = 0; i < keys.Length; i++)
+            {
+                inputs[i] = new Input
+                {
+                    type = INPUT_KEYBOARD,
+                    u = new InputUnion { ki = new KeybdInput { wVk = keys[i], dwFlags = 0 } }
+                };
+            }
+
+            // Release keys in reverse order
+            for (int i = keys.Length - 1; i >= 0; i--)
+            {
+                inputs[keys.Length + (keys.Length - 1 - i)] = new Input
+                {
+                    type = INPUT_KEYBOARD,
+                    u = new InputUnion { ki = new KeybdInput { wVk = keys[i], dwFlags = KEYEVENTF_KEYUP } }
+                };
+            }
+
+            SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(Input)));
+        }
+
         // Win32 API Declarations
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -729,9 +1078,38 @@ namespace PlayniteGameOverlay
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput(uint nInputs, Input[] pInputs, int cbSize);
+
         private const int SW_RESTORE = 9;
+        private const int SW_MAXIMIZE = 3;
+        private const int INPUT_KEYBOARD = 1;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
 
         // Event to request showing Playnite (to be handled by the plugin)
         public event Action OnShowPlayniteRequested;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct Input
+    {
+        public int type;
+        public InputUnion u;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    struct InputUnion
+    {
+        [FieldOffset(0)] public KeybdInput ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct KeybdInput
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
     }
 }

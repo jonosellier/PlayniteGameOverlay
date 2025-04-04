@@ -13,8 +13,8 @@ using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using SDL2;
 using System.Windows.Threading;
-using System.Runtime;
 using System.ComponentModel;
+using IWshRuntimeLibrary;
 
 namespace PlayniteGameOverlay
 {
@@ -68,6 +68,54 @@ namespace PlayniteGameOverlay
             Properties = new GenericPluginProperties { HasSettings = true };
         }
 
+        public List<ButtonItem> ReadShortcutsFromDirectory(string directoryPath)
+        {
+            var buttonItems = new List<ButtonItem>();
+
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+                return buttonItems;
+            }
+
+            var shortcutFiles = Directory.GetFiles(directoryPath, "*.lnk");
+
+            foreach (var shortcutPath in shortcutFiles)
+            {
+                try
+                {
+                    var shell = new WshShell();
+                    var shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+
+                    var button = new ButtonItem
+                    {
+                        Title = Path.GetFileNameWithoutExtension(shortcutPath),
+                        ActionType = ButtonAction.Shortcut,
+                        Path = Path.GetFullPath(shortcutPath),
+                        IconPath = @"C:\Users\Jono\Downloads\pngegg.png"
+                    };
+
+                    buttonItems.Add(button);
+                }
+                catch (Exception ex)
+                {
+                    // Handle exceptions as needed (e.g. log or skip)
+                    log($"Failed to process shortcut: {shortcutPath}, Error: {ex.Message}");
+                }
+            }
+
+            foreach(var button in buttonItems)
+            {
+                log("---- ButtonItem ----");
+                log($"Title:      {button.Title}");
+                log($"ActionType: {button.ActionType}");
+                log($"Path:       {button.Path}");
+                log($"IconPath:   {button.IconPath}");
+            }
+
+            return buttonItems;
+        }
+
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             logger.Info("Starting Overlay Extension...");
@@ -75,8 +123,11 @@ namespace PlayniteGameOverlay
             // Check if SuccessStory is installed
             CheckSuccessStoryAvailability();
 
+            var buttonItems = ReadShortcutsFromDirectory(Path.Combine(
+                            playniteAPI.Paths.ExtensionsDataPath, Id.ToString(), "Shortcuts"));
+
             // Initialize overlay window
-            overlayWindow = new OverlayWindow(Settings.DebugMode);
+            overlayWindow = new OverlayWindow(buttonItems.ToArray(), Settings.DebugMode);
             overlayWindow.Hide();
 
             // Set up show Playnite handler
@@ -212,9 +263,9 @@ namespace PlayniteGameOverlay
                         {
                             // Look for a file containing achievements for this game
                             string achievementsFile = Path.Combine(successStoryDir, $"{game.Id}.json");
-                            if (File.Exists(achievementsFile))
+                            if (System.IO.File.Exists(achievementsFile))
                             {
-                                string achievementsJson = File.ReadAllText(achievementsFile);
+                                string achievementsJson = System.IO.File.ReadAllText(achievementsFile);
                                 achievements = ParseSuccessStoryData(achievementsJson);
                             }
                         }
