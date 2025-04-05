@@ -81,7 +81,7 @@ namespace PlayniteGameOverlay
             // Set initial focus to first button
             ReturnToGameButton.Focus();
             SetAspectRatio();
-            ShortcutButtons = new ObservableCollection<ButtonItem>(buttons);
+            ShortcutButtons = new ObservableCollection<ButtonItem>(settings.ButtonItems);
             CreateButtons();
         }
 
@@ -206,6 +206,8 @@ namespace PlayniteGameOverlay
         private void Button_Click(object sender, RoutedEventArgs e, ButtonItem buttonItem)
         {
             // Handle button click based on ActionType
+
+            Hide(); // Hide the overlay after button click
             try
             {
                 switch (buttonItem.ActionType)
@@ -289,7 +291,7 @@ namespace PlayniteGameOverlay
                     case ButtonAction.KeyboardShortcut:
                         Hide(); // Hide the overlay before shortcut
                         Thread.Sleep(1500);
-                        ExecuteShortcut(buttonItem.Path);
+                        SendKeys.SendWait(buttonItem.Path);
                         break;
                     case ButtonAction.Shortcut:
                         // Check if the shortcut is a valid executable
@@ -315,12 +317,11 @@ namespace PlayniteGameOverlay
                         }
                         break;
                 }
-
-                Hide(); // Hide the overlay after button click
             }
             catch (Exception ex)
             {
                 log($"Error executing button action: {ex.Message}\n\n {buttonItem.Path}", "BUTTON_ERROR");
+                this.Show();
             }
         }
 
@@ -1058,34 +1059,6 @@ namespace PlayniteGameOverlay
         }
         #endregion
 
-        private void ExecuteShortcut(string keyCodes)
-        {
-            var keys = keyCodes.Split(' ').Select(k => Convert.ToUInt16(k, 16)).ToArray();
-            Input[] inputs = new Input[keys.Length * 2];
-
-            // Press modifier keys first
-            for (int i = 0; i < keys.Length; i++)
-            {
-                inputs[i] = new Input
-                {
-                    type = INPUT_KEYBOARD,
-                    u = new InputUnion { ki = new KeybdInput { wVk = keys[i], dwFlags = 0 } }
-                };
-            }
-
-            // Release keys in reverse order
-            for (int i = keys.Length - 1; i >= 0; i--)
-            {
-                inputs[keys.Length + (keys.Length - 1 - i)] = new Input
-                {
-                    type = INPUT_KEYBOARD,
-                    u = new InputUnion { ki = new KeybdInput { wVk = keys[i], dwFlags = KEYEVENTF_KEYUP } }
-                };
-            }
-
-            SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(Input)));
-        }
-
         // Win32 API Declarations
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -1108,38 +1081,11 @@ namespace PlayniteGameOverlay
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern uint SendInput(uint nInputs, Input[] pInputs, int cbSize);
 
         private const int SW_RESTORE = 9;
         private const int SW_MAXIMIZE = 3;
-        private const int INPUT_KEYBOARD = 1;
-        private const uint KEYEVENTF_KEYUP = 0x0002;
 
         // Event to request showing Playnite (to be handled by the plugin)
         public event Action OnShowPlayniteRequested;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct Input
-    {
-        public int type;
-        public InputUnion u;
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    struct InputUnion
-    {
-        [FieldOffset(0)] public KeybdInput ki;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct KeybdInput
-    {
-        public ushort wVk;
-        public ushort wScan;
-        public uint dwFlags;
-        public uint time;
-        public IntPtr dwExtraInfo;
     }
 }

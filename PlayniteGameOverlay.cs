@@ -26,6 +26,8 @@ namespace PlayniteGameOverlay
 
         private GameOverlayData GameOverlayData;
 
+        public List<ButtonItem> ButtonItems = new List<ButtonItem>();
+
         private OverlayWindow overlayWindow;
         private IPlayniteAPI playniteAPI;
         private GlobalKeyboardHook keyboardHook;
@@ -125,11 +127,11 @@ namespace PlayniteGameOverlay
             // Check if SuccessStory is installed
             CheckSuccessStoryAvailability();
 
-            var buttonItems = ReadShortcutsFromDirectory(Path.Combine(
+            ButtonItems = ReadShortcutsFromDirectory(Path.Combine(
                             playniteAPI.Paths.ExtensionsDataPath, Id.ToString(), "Shortcuts"));
 
             // Initialize overlay window
-            overlayWindow = new OverlayWindow(Settings, buttonItems.ToArray());
+            overlayWindow = new OverlayWindow(Settings, ButtonItems.ToArray());
             overlayWindow.Hide();
 
             // Set up show Playnite handler
@@ -148,7 +150,7 @@ namespace PlayniteGameOverlay
         public void ReloadOverlay(OverlaySettings settings)
         {
             overlayWindow.Close(); //close old window
-            overlayWindow = new OverlayWindow(settings != null ? settings : Settings); //open new one
+            overlayWindow = new OverlayWindow(settings != null ? settings : Settings, ButtonItems.ToArray()); //open new one
             overlayWindow.Hide();
             if(GameOverlayData != null)
             {
@@ -182,17 +184,17 @@ namespace PlayniteGameOverlay
             {
                 var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
 
-                if (runningGame != null)
-                {
+                //if (runningGame != null)
+                //{
                     if (overlayWindow.IsVisible)
                         overlayWindow.Hide();
                     else
                         ShowGameOverlay(runningGame);
-                }
-                else
-                {
-                    ShowPlaynite();
-                }
+                //}
+                //else
+                //{
+                //    ShowPlaynite();
+                //}
             }
 
             // Escape to hide overlay
@@ -233,7 +235,7 @@ namespace PlayniteGameOverlay
 
         private void ShowGameOverlay(Game game)
         {
-            if (game == null) return;
+            //if (game == null) return;
 
             var gameOverlayData = CreateGameOverlayData(game, FindRunningGameProcess(game)?.Id, gameStarted);
             overlayWindow.UpdateGameOverlay(gameOverlayData);
@@ -823,6 +825,23 @@ namespace PlayniteGameOverlay
         private ControllerShortcut _controllerShortcut = ControllerShortcut.StartBack;
         private bool _debugMode = false;
         private AspectRatio _aspectRatio = AspectRatio.Portrait;
+        private List<ButtonItem> _buttonItems = new List<ButtonItem>
+        {
+            new ButtonItem
+            {
+                Title = "Discord",
+                ActionType = ButtonAction.Uri,
+                Path = @"discord://-/",
+                IconPath = @"https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/discord-white-icon.png"
+            },
+            new ButtonItem
+            {
+                Title = "GPU Settings",
+                ActionType = ButtonAction.KeyboardShortcut,
+                Path = "%r",
+                IconPath = "https://img.icons8.com/m_rounded/512/FFFFFF/settings.png"
+            }
+        };
 
         public ControllerShortcut ControllerShortcut
         {
@@ -840,6 +859,12 @@ namespace PlayniteGameOverlay
         {
             get => _aspectRatio;
             set => SetValue(ref _aspectRatio, value);
+        }
+
+        public List<ButtonItem> ButtonItems
+        {
+            get => _buttonItems;
+            set => SetValue(ref _buttonItems, value);
         }
 
         // Backup values for cancel operation
