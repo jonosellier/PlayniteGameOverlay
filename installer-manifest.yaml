@@ -14,3 +14,10 @@ Packages:
       - Added controller support for overlay navigation.
       - Added ability to customize controller hotkey for activation (Choose between Guide or Start+Select).
       - New Icon
+  - Version: 0.3.0
+    RequiredApiVersion: 6.11.0.0
+    ReleaseDate: 2025-04-03
+    PackageUrl: https://github.com/jonosellier/PlayniteGameOverlay/releases/download/v0.2.0/PlayniteGameOverlay_fc75626e-ec69-4287-972a-b86298555ebb_0_2.pext
+    Changelog:
+      - Added square and landscape game cover support
+      - Fix infinite "Addon Update Available notification" 
