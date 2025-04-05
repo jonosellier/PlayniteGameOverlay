@@ -15,7 +15,6 @@ using Orientation = System.Windows.Controls.Orientation;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using System.Windows.Media;
 using System.Threading;
-using System.Windows.Media.Media3D;
 
 namespace PlayniteGameOverlay
 {
