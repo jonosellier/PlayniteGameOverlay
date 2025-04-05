@@ -44,7 +44,11 @@ namespace PlayniteGameOverlay
             {
                 return GetEnumDescription(enumValue);
             }
-            return value.ToString();
+            if(value != null)
+            {
+                return value.ToString();
+            }
+            return "";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

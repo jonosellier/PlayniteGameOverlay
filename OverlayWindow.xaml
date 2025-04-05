@@ -141,11 +141,10 @@
             <!-- Content container -->
             <TextBlock x:Name="GameTitle" Foreground="White" FontWeight="Bold" HorizontalAlignment="Left" 
                            Margin="36,4,0,0" Height="56" VerticalAlignment="Top" FontSize="36" Width="1309"><Run Text="Game Name Here"/><LineBreak/><Run/></TextBlock>
-            <Border BorderBrush="#80808080" BorderThickness="1,1,1,1" Width="377" Height="527" Margin="0,120,36,0" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="8,8,8,8" Background="#80808080">
-
-                <Border BorderBrush="#80808080" BorderThickness="0,0,0,0" Width="375" Height="525" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="7,7,7,7" Margin="0,0,0,0">
+            <Border x:Name="OuterImgBorder" BorderBrush="#80808080" BorderThickness="1,1,1,1" Width="377" Height="527" Margin="0,120,36,0" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="8,8,8,8" Background="#80808080">
+                <Border x:Name="InnerImgBorder" BorderBrush="#80808080" BorderThickness="0,0,0,0" Width="375" Height="525" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="7,7,7,7" Margin="0,0,0,0">
                     <Border.Clip>
-                        <RectangleGeometry RadiusX="7" RadiusY="7" Rect="0,0,375,525"/>
+                        <RectangleGeometry RadiusX="7" RadiusY="7" Rect="0,0,375,525" x:Name="ImgBorderClip"/>
                     </Border.Clip>
                     <Image x:Name="GameCoverImage" 
            Stretch="UniformToFill" Width="375" Height="525" VerticalAlignment="Center" HorizontalAlignment="Center" Source="/PlayniteGameOverlay;component/917bd40b-a43c-439f-848c-2f82b49d8590.jpg"/>
@@ -162,8 +161,8 @@
                 <TextBlock x:Name="BatteryText" HorizontalAlignment="Left" Margin="1436,13,0,0" TextWrapping="Wrap" Text="100%" VerticalAlignment="Top" FontWeight="Bold" Foreground="White" Width="37" TextAlignment="Center" Height="16"/>
             </Grid>
             <TextBlock x:Name="ProcessInfo_DEBUG" HorizontalAlignment="Left" Margin="355,124,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Height="286" Width="821" Foreground="White" RenderTransformOrigin="0.526,0.47"><Run Text="Debug info goes here"/><LineBreak/><Run/></TextBlock>
-            <Border Background="#FF242424" CornerRadius="10" 
-Width="375" Height="56" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,677,36,0" BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="8,8,8,4">
+            <Border x:Name="SessionPanel" Background="#FF242424" CornerRadius="10" 
+Width="375" Height="56" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,677,36,0" BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="18,8,18,4">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -184,7 +183,7 @@ Width="375" Height="56" VerticalAlignment="Top" HorizontalAlignment="Right" Marg
 Width="16" 
 Height="16"
 Data="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z" Margin="0,0,8,0"/>
-                        <TextBlock x:Name="PlayTime" TextWrapping="Wrap" Foreground="#FFFFFFFF" FontSize="20" FontWeight="Bold" Text="12453 Hours"/>
+                        <TextBlock x:Name="PlayTime" TextWrapping="Wrap" Foreground="#FFFFFFFF" FontSize="20" FontWeight="Bold" Text="99999 Hours"/>
                     </StackPanel>
 
                     <!-- Session Play Time (Column 2) -->
