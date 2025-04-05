@@ -114,6 +114,8 @@
     <None Include="extension.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="installer-manifest.yaml" />
+    <None Include="jonosellier_PlayniteGameOverlay.yaml" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

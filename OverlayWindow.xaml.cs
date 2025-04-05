@@ -9,16 +9,17 @@ using System.Linq;
 using SDL2;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media.Media3D;
 
 namespace PlayniteGameOverlay
 {
     public partial class OverlayWindow : Window
     {
-        private bool IS_DEBUG = true;
+        private OverlaySettings Settings;
 
         private void log(string msg, string tag = "DEBUG")
         {
-            if (IS_DEBUG)
+            if (Settings != null && Settings.DebugMode)
             {
                 Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
             }
@@ -43,13 +44,12 @@ namespace PlayniteGameOverlay
 
         private const int DEBOUNCE_THRESHOLD = 100; // 100 milliseconds debounce threshold
 
-        public OverlayWindow(bool debug = false)
+        public OverlayWindow(OverlaySettings settings)
         {
             InitializeComponent();
 
-            IS_DEBUG = debug;
+            Settings = settings;
 
-            // Set the window to fullscreen
             // Set the window to fullscreen
             this.WindowState = WindowState.Maximized;
 
@@ -73,6 +73,38 @@ namespace PlayniteGameOverlay
 
             // Set initial focus to first button
             ReturnToGameButton.Focus();
+
+            SetAspectRatio();
+        }
+
+        private void SetAspectRatio()
+        {
+            switch (Settings.AspectRatio)
+            {
+                case AspectRatio.Portrait:
+                    GameCoverImage.Height = 525;
+                    GameCoverImage.Width = 375;
+                    break;
+                case AspectRatio.Landscape:
+                    GameCoverImage.Height = 262;
+                    GameCoverImage.Width = 550;
+                    break;
+                case AspectRatio.Square:
+                    GameCoverImage.Height = 425;
+                    GameCoverImage.Width = 425;
+                    break;
+            }
+            OuterImgBorder.Width = GameCoverImage.Width + 2;
+            OuterImgBorder.Height = GameCoverImage.Height + 2;
+            InnerImgBorder.Width = GameCoverImage.Width;
+            InnerImgBorder.Height = GameCoverImage.Height;
+            ImgBorderClip.Rect = new Rect(0, 0, GameCoverImage.Width, GameCoverImage.Height);
+
+            // Update the corner radius
+            ImgBorderClip.RadiusX = 7;
+            ImgBorderClip.RadiusY = 7;
+
+            SessionPanel.Margin = new Thickness(0, GameCoverImage.Height + 152, 36, 0);
         }
 
         private void OverlayWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -303,7 +335,7 @@ namespace PlayniteGameOverlay
 
         private void UpdateDebugInfo(GameOverlayData gameData)
         {
-            if (IS_DEBUG)
+            if (Settings != null && Settings.DebugMode)
             { 
                 ProcessInfo_DEBUG.Visibility = Visibility.Visible;
                 if (gameData == null)

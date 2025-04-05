@@ -24,6 +24,8 @@ namespace PlayniteGameOverlay
 
         private OverlaySettings settings;
 
+        private GameOverlayData GameOverlayData;
+
         private OverlayWindow overlayWindow;
         private IPlayniteAPI playniteAPI;
         private GlobalKeyboardHook keyboardHook;
@@ -76,7 +78,7 @@ namespace PlayniteGameOverlay
             CheckSuccessStoryAvailability();
 
             // Initialize overlay window
-            overlayWindow = new OverlayWindow(Settings.DebugMode);
+            overlayWindow = new OverlayWindow(Settings);
             overlayWindow.Hide();
 
             // Set up show Playnite handler
@@ -90,6 +92,20 @@ namespace PlayniteGameOverlay
             {
                 controllerTimer.Stop();
             }
+        }
+
+        public void ReloadOverlay(OverlaySettings settings)
+        {
+            overlayWindow.Close(); //close old window
+            overlayWindow = new OverlayWindow(settings != null ? settings : Settings); //open new one
+            overlayWindow.Hide();
+            if(GameOverlayData != null)
+            {
+                overlayWindow.UpdateGameOverlay(GameOverlayData);
+            }
+
+            // Set up show Playnite handler again
+            overlayWindow.OnShowPlayniteRequested += ShowPlaynite;
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -141,6 +157,7 @@ namespace PlayniteGameOverlay
             {
                 gameStarted = DateTime.Now;
                 var gameOverlayData = CreateGameOverlayData(args.Game, args.StartedProcessId, gameStarted);
+                GameOverlayData = gameOverlayData;
                 overlayWindow.UpdateGameOverlay(gameOverlayData);
                 if (controllerTimer != null)
                 {
@@ -156,6 +173,7 @@ namespace PlayniteGameOverlay
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
             overlayWindow.UpdateGameOverlay(null);
+            GameOverlayData = null;
             if (controllerTimer != null)
             {
                 controllerTimer.Stop();
@@ -748,11 +766,12 @@ namespace PlayniteGameOverlay
 
     public class OverlaySettings : ObservableObject, ISettings
     {
-        private readonly Plugin plugin;
+        private readonly PlayniteGameOverlay plugin;
 
         // Using properties with setters that notify of changes
         private ControllerShortcut _controllerShortcut = ControllerShortcut.StartBack;
         private bool _debugMode = false;
+        private AspectRatio _aspectRatio = AspectRatio.Portrait;
 
         public ControllerShortcut ControllerShortcut
         {
@@ -766,6 +785,12 @@ namespace PlayniteGameOverlay
             set => SetValue(ref _debugMode, value);
         }
 
+        public AspectRatio AspectRatio
+        {
+            get => _aspectRatio;
+            set => SetValue(ref _aspectRatio, value);
+        }
+
         // Backup values for cancel operation
         private ControllerShortcut _controllerShortcutBackup;
         private bool _debugModeBackup;
@@ -776,7 +801,7 @@ namespace PlayniteGameOverlay
         }
 
         // Main constructor that loads saved settings
-        public OverlaySettings(Plugin plugin)
+        public OverlaySettings(PlayniteGameOverlay plugin)
         {
             this.plugin = plugin;
 
@@ -784,8 +809,12 @@ namespace PlayniteGameOverlay
             var savedSettings = plugin.LoadPluginSettings<OverlaySettings>();
             if (savedSettings != null)
             {
-                ControllerShortcut = savedSettings.ControllerShortcut;
-                DebugMode = savedSettings.DebugMode;
+                if(savedSettings.ControllerShortcut != null)
+                    ControllerShortcut = savedSettings.ControllerShortcut;
+                if (savedSettings.DebugMode != null)
+                    DebugMode = savedSettings.DebugMode;
+                if (savedSettings.AspectRatio!= null)
+                    AspectRatio = savedSettings.AspectRatio;
             }
         }
 
@@ -807,6 +836,7 @@ namespace PlayniteGameOverlay
         {
             // Save settings to persistent storage
             plugin.SavePluginSettings(this);
+            plugin.ReloadOverlay(this);
         }
 
         public bool VerifySettings(out List<string> errors)
@@ -824,5 +854,12 @@ namespace PlayniteGameOverlay
 
         [Description("Xbox Button (Guide Button)")]
         Guide
+    }
+
+    public enum AspectRatio
+    {
+        Portrait,
+        Landscape,
+        Square
     }
 }
