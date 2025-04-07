@@ -448,11 +448,20 @@ namespace PlayniteGameOverlay
             logger.Debug(msg);
         }
 
-
         private void ShowPlaynite()
+        {
+            ShowPlaynite(false);
+        }
+        private void ShowPlaynite(bool forceFullscreen = false)
         {
             try
             {
+                // If fullscreen is forced, just launch it. It will either focus the existing app or switch to fullscreen
+                if (forceFullscreen)
+                {
+                    Process.Start(Path.Combine(playniteAPI.Paths.ApplicationPath, "Playnite.FullscreenApp.exe"));
+                    return;
+                }
                 // Try desktop first
                 Process[] processes = Process.GetProcessesByName("Playnite.DesktopApp");
                 if(processes.Length > 0)
@@ -662,7 +671,7 @@ namespace PlayniteGameOverlay
                         ShowGameOverlay(runningGame);
                 } else
                 {
-                    log("No running game found to show overlay", "WARNING");
+                    ShowPlaynite(true);
                 }
             }
         }
