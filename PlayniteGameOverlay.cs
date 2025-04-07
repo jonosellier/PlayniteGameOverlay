@@ -453,22 +453,19 @@ namespace PlayniteGameOverlay
         {
             try
             {
+                // Try desktop first
                 Process[] processes = Process.GetProcessesByName("Playnite.DesktopApp");
-                if (processes.Length == 0)
+                if(processes.Length > 0)
                 {
-                    processes = Process.GetProcessesByName("Playnite.FullscreenApp");
+                    Process.Start(Path.Combine(playniteAPI.Paths.ApplicationPath, "Playnite.DesktopApp.exe"));
+                    return;
                 }
-
+                // Then try fullscreen
+                processes = Process.GetProcessesByName("Playnite.FullscreenApp");
                 if (processes.Length > 0)
                 {
-                    // Use the Win32 API calls you already have to activate the window
-                    Process proc = processes[0];
-                    if (IsIconic(proc.MainWindowHandle))
-                    {
-                        ShowWindow(proc.MainWindowHandle, SW_RESTORE);
-                    }
-                    SetForegroundWindow(proc.MainWindowHandle);
-                    log("Activated Playnite process: " + proc.ProcessName);
+                    Process.Start(Path.Combine(playniteAPI.Paths.ApplicationPath, "Playnite.FullscreenApp.exe"));
+                    return;
                 }
                 else
                 {
