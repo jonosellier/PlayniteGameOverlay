@@ -825,23 +825,22 @@ namespace PlayniteGameOverlay
         private ControllerShortcut _controllerShortcut = ControllerShortcut.StartBack;
         private bool _debugMode = false;
         private AspectRatio _aspectRatio = AspectRatio.Portrait;
-        private List<ButtonItem> _buttonItems = new List<ButtonItem>
-        {
-            new ButtonItem
-            {
-                Title = "Discord",
-                ActionType = ButtonAction.Uri,
-                Path = @"discord://-/",
-                IconPath = @"https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/discord-white-icon.png"
-            },
-            new ButtonItem
-            {
-                Title = "GPU Settings",
-                ActionType = ButtonAction.KeyboardShortcut,
-                Path = "%r",
-                IconPath = "https://img.icons8.com/m_rounded/512/FFFFFF/settings.png"
-            }
-        };
+
+        // Toggle properties for showing/hiding buttons
+        private bool _showRecordGameplay = true;
+        private bool _showRecordRecent = true;
+        private bool _showStreaming = true;
+        private bool _showPerformanceOverlay = true;
+        private bool _showScreenshotGallery = true;
+        private bool _showWebBrowser = true;
+
+        // Shortcut and path properties
+        private string _recordGameplayShortcut = "";
+        private string _recordRecentShortcut = "";
+        private string _streamingShortcut = "";
+        private string _performanceOverlayShortcut = "";
+        private string _screenshotGalleryPath = "";
+        private string _webBrowserPath = "";
 
         public ControllerShortcut ControllerShortcut
         {
@@ -861,15 +860,95 @@ namespace PlayniteGameOverlay
             set => SetValue(ref _aspectRatio, value);
         }
 
-        public List<ButtonItem> ButtonItems
+        // Properties for toggle options
+        public bool ShowRecordGameplay
         {
-            get => _buttonItems;
-            set => SetValue(ref _buttonItems, value);
+            get => _showRecordGameplay;
+            set => SetValue(ref _showRecordGameplay, value);
+        }
+
+        public bool ShowRecordRecent
+        {
+            get => _showRecordRecent;
+            set => SetValue(ref _showRecordRecent, value);
+        }
+
+        public bool ShowStreaming
+        {
+            get => _showStreaming;
+            set => SetValue(ref _showStreaming, value);
+        }
+
+        public bool ShowPerformanceOverlay
+        {
+            get => _showPerformanceOverlay;
+            set => SetValue(ref _showPerformanceOverlay, value);
+        }
+
+        public bool ShowScreenshotGallery
+        {
+            get => _showScreenshotGallery;
+            set => SetValue(ref _showScreenshotGallery, value);
+        }
+
+        public bool ShowWebBrowser
+        {
+            get => _showWebBrowser;
+            set => SetValue(ref _showWebBrowser, value);
+        }
+
+        // Properties for shortcuts and paths
+        public string RecordGameplayShortcut
+        {
+            get => _recordGameplayShortcut;
+            set => SetValue(ref _recordGameplayShortcut, value);
+        }
+
+        public string RecordRecentShortcut
+        {
+            get => _recordRecentShortcut;
+            set => SetValue(ref _recordRecentShortcut, value);
+        }
+
+        public string StreamingShortcut
+        {
+            get => _streamingShortcut;
+            set => SetValue(ref _streamingShortcut, value);
+        }
+
+        public string PerformanceOverlayShortcut
+        {
+            get => _performanceOverlayShortcut;
+            set => SetValue(ref _performanceOverlayShortcut, value);
+        }
+
+        public string ScreenshotGalleryPath
+        {
+            get => _screenshotGalleryPath;
+            set => SetValue(ref _screenshotGalleryPath, value);
+        }
+
+        public string WebBrowserPath
+        {
+            get => _webBrowserPath;
+            set => SetValue(ref _webBrowserPath, value);
         }
 
         // Backup values for cancel operation
         private ControllerShortcut _controllerShortcutBackup;
         private bool _debugModeBackup;
+        private bool _showRecordGameplayBackup;
+        private bool _showRecordRecentBackup;
+        private bool _showStreamingBackup;
+        private bool _showPerformanceOverlayBackup;
+        private bool _showScreenshotGalleryBackup;
+        private bool _showWebBrowserBackup;
+        private string _recordGameplayShortcutBackup;
+        private string _recordRecentShortcutBackup;
+        private string _streamingShortcutBackup;
+        private string _performanceOverlayShortcutBackup;
+        private string _screenshotGalleryPathBackup;
+        private string _webBrowserPathBackup;
 
         // Parameterless constructor needed for serialization
         public OverlaySettings()
@@ -885,12 +964,28 @@ namespace PlayniteGameOverlay
             var savedSettings = plugin.LoadPluginSettings<OverlaySettings>();
             if (savedSettings != null)
             {
-                if(savedSettings.ControllerShortcut != null)
+                if (savedSettings.ControllerShortcut != null)
                     ControllerShortcut = savedSettings.ControllerShortcut;
                 if (savedSettings.DebugMode != null)
                     DebugMode = savedSettings.DebugMode;
-                if (savedSettings.AspectRatio!= null)
+                if (savedSettings.AspectRatio != null)
                     AspectRatio = savedSettings.AspectRatio;
+
+                // Load toggle settings
+                if(savedSettings.ShowRecordGameplay != null) ShowRecordGameplay = savedSettings.ShowRecordGameplay;
+                if(savedSettings.ShowRecordRecent != null) ShowRecordRecent = savedSettings.ShowRecordRecent;
+                if(savedSettings.ShowStreaming != null) ShowStreaming = savedSettings.ShowStreaming;
+                if(savedSettings.ShowPerformanceOverlay != null) ShowPerformanceOverlay = savedSettings.ShowPerformanceOverlay;
+                if(savedSettings.ShowScreenshotGallery != null) ShowScreenshotGallery = savedSettings.ShowScreenshotGallery;
+                if(savedSettings.ShowWebBrowser != null) ShowWebBrowser = savedSettings.ShowWebBrowser;
+
+                // Load shortcut and path settings
+                if (savedSettings.RecordGameplayShortcut != null) RecordGameplayShortcut = savedSettings.RecordGameplayShortcut;
+                if(savedSettings.RecordRecentShortcut != null) RecordRecentShortcut = savedSettings.RecordRecentShortcut;
+                if(savedSettings.StreamingShortcut != null) StreamingShortcut = savedSettings.StreamingShortcut;
+                if(savedSettings.PerformanceOverlayShortcut != null) PerformanceOverlayShortcut = savedSettings.PerformanceOverlayShortcut;
+                if(savedSettings.ScreenshotGalleryPath != null) ScreenshotGalleryPath = savedSettings.ScreenshotGalleryPath;
+                if(savedSettings.WebBrowserPath != null) WebBrowserPath = savedSettings.WebBrowserPath;
             }
         }
 
@@ -899,6 +994,22 @@ namespace PlayniteGameOverlay
             // Backup current values in case user cancels
             _controllerShortcutBackup = ControllerShortcut;
             _debugModeBackup = DebugMode;
+
+            // Backup toggle values
+            _showRecordGameplayBackup = ShowRecordGameplay;
+            _showRecordRecentBackup = ShowRecordRecent;
+            _showStreamingBackup = ShowStreaming;
+            _showPerformanceOverlayBackup = ShowPerformanceOverlay;
+            _showScreenshotGalleryBackup = ShowScreenshotGallery;
+            _showWebBrowserBackup = ShowWebBrowser;
+
+            // Backup shortcut and path values
+            _recordGameplayShortcutBackup = RecordGameplayShortcut;
+            _recordRecentShortcutBackup = RecordRecentShortcut;
+            _streamingShortcutBackup = StreamingShortcut;
+            _performanceOverlayShortcutBackup = PerformanceOverlayShortcut;
+            _screenshotGalleryPathBackup = ScreenshotGalleryPath;
+            _webBrowserPathBackup = WebBrowserPath;
         }
 
         public void CancelEdit()
@@ -906,6 +1017,22 @@ namespace PlayniteGameOverlay
             // Restore from backup
             ControllerShortcut = _controllerShortcutBackup;
             DebugMode = _debugModeBackup;
+
+            // Restore toggle backups
+            ShowRecordGameplay = _showRecordGameplayBackup;
+            ShowRecordRecent = _showRecordRecentBackup;
+            ShowStreaming = _showStreamingBackup;
+            ShowPerformanceOverlay = _showPerformanceOverlayBackup;
+            ShowScreenshotGallery = _showScreenshotGalleryBackup;
+            ShowWebBrowser = _showWebBrowserBackup;
+
+            // Restore shortcut and path backups
+            RecordGameplayShortcut = _recordGameplayShortcutBackup;
+            RecordRecentShortcut = _recordRecentShortcutBackup;
+            StreamingShortcut = _streamingShortcutBackup;
+            PerformanceOverlayShortcut = _performanceOverlayShortcutBackup;
+            ScreenshotGalleryPath = _screenshotGalleryPathBackup;
+            WebBrowserPath = _webBrowserPathBackup;
         }
 
         public void EndEdit()
@@ -922,7 +1049,6 @@ namespace PlayniteGameOverlay
             return true;
         }
     }
-
     public enum ControllerShortcut
     {
         [Description("View + Menu (Back + Start)")]

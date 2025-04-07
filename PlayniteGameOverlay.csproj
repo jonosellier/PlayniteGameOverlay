@@ -215,6 +215,7 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ButtonActions.cs" />
     <Compile Include="ButtonItem.cs" />
     <Compile Include="GlobalKeyboardHook.cs" />
     <Compile Include="OverlaySettingsView.xaml.cs">
