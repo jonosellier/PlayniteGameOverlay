@@ -26,8 +26,6 @@ namespace PlayniteGameOverlay
 
         private GameOverlayData GameOverlayData;
 
-        public List<ButtonItem> ButtonItems = new List<ButtonItem>();
-
         private OverlayWindow overlayWindow;
         private IPlayniteAPI playniteAPI;
         private GlobalKeyboardHook keyboardHook;
@@ -72,54 +70,6 @@ namespace PlayniteGameOverlay
             Properties = new GenericPluginProperties { HasSettings = true };
         }
 
-        public List<ButtonItem> ReadShortcutsFromDirectory(string directoryPath)
-        {
-            var buttonItems = new List<ButtonItem>();
-
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-                return buttonItems;
-            }
-
-            var shortcutFiles = Directory.GetFiles(directoryPath, "*.lnk");
-
-            foreach (var shortcutPath in shortcutFiles)
-            {
-                try
-                {
-                    var shell = new WshShell();
-                    var shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
-
-                    var button = new ButtonItem
-                    {
-                        Title = Path.GetFileNameWithoutExtension(shortcutPath),
-                        ActionType = ButtonAction.Shortcut,
-                        Path = Path.GetFullPath(shortcutPath),
-                        IconPath = @"C:\Users\Jono\Downloads\pngegg.png"
-                    };
-
-                    buttonItems.Add(button);
-                }
-                catch (Exception ex)
-                {
-                    // Handle exceptions as needed (e.g. log or skip)
-                    log($"Failed to process shortcut: {shortcutPath}, Error: {ex.Message}");
-                }
-            }
-
-            foreach(var button in buttonItems)
-            {
-                log("---- ButtonItem ----");
-                log($"Title:      {button.Title}");
-                log($"ActionType: {button.ActionType}");
-                log($"Path:       {button.Path}");
-                log($"IconPath:   {button.IconPath}");
-            }
-
-            return buttonItems;
-        }
-
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             logger.Info("Starting Overlay Extension...");
@@ -127,11 +77,8 @@ namespace PlayniteGameOverlay
             // Check if SuccessStory is installed
             CheckSuccessStoryAvailability();
 
-            ButtonItems = ReadShortcutsFromDirectory(Path.Combine(
-                            playniteAPI.Paths.ExtensionsDataPath, Id.ToString(), "Shortcuts"));
-
             // Initialize overlay window
-            overlayWindow = new OverlayWindow(Settings, ButtonItems.ToArray());
+            overlayWindow = new OverlayWindow(Settings);
             overlayWindow.Hide();
 
             // Set up show Playnite handler
@@ -150,7 +97,7 @@ namespace PlayniteGameOverlay
         public void ReloadOverlay(OverlaySettings settings)
         {
             overlayWindow.Close(); //close old window
-            overlayWindow = new OverlayWindow(settings != null ? settings : Settings, ButtonItems.ToArray()); //open new one
+            overlayWindow = new OverlayWindow(settings != null ? settings : Settings); //open new one
             overlayWindow.Hide();
             if(GameOverlayData != null)
             {
@@ -861,6 +808,8 @@ namespace PlayniteGameOverlay
         private bool _showPerformanceOverlay = true;
         private bool _showScreenshotGallery = true;
         private bool _showWebBrowser = true;
+        private bool _showDiscord = true;
+        private bool _showBattery = true;
 
         // Shortcut and path properties
         private string _recordGameplayShortcut = "";
@@ -925,6 +874,18 @@ namespace PlayniteGameOverlay
             set => SetValue(ref _showWebBrowser, value);
         }
 
+        public bool ShowDiscord
+        {
+            get => _showDiscord;
+            set => SetValue(ref _showDiscord, value);
+        }
+
+        public bool ShowBattery
+        {
+            get => _showBattery;
+            set => SetValue(ref _showBattery, value);
+        }
+
         // Properties for shortcuts and paths
         public string RecordGameplayShortcut
         {
@@ -971,6 +932,8 @@ namespace PlayniteGameOverlay
         private bool _showPerformanceOverlayBackup;
         private bool _showScreenshotGalleryBackup;
         private bool _showWebBrowserBackup;
+        private bool _showDiscordBackup;
+        private bool _showBatteryBackup;
         private string _recordGameplayShortcutBackup;
         private string _recordRecentShortcutBackup;
         private string _streamingShortcutBackup;
@@ -1006,6 +969,8 @@ namespace PlayniteGameOverlay
                 if(savedSettings.ShowPerformanceOverlay != null) ShowPerformanceOverlay = savedSettings.ShowPerformanceOverlay;
                 if(savedSettings.ShowScreenshotGallery != null) ShowScreenshotGallery = savedSettings.ShowScreenshotGallery;
                 if(savedSettings.ShowWebBrowser != null) ShowWebBrowser = savedSettings.ShowWebBrowser;
+                if(savedSettings.ShowDiscord != null) ShowDiscord = savedSettings.ShowDiscord;
+                if(savedSettings.ShowBattery != null) ShowBattery = savedSettings.ShowBattery;
 
                 // Load shortcut and path settings
                 if (savedSettings.RecordGameplayShortcut != null) RecordGameplayShortcut = savedSettings.RecordGameplayShortcut;
@@ -1030,6 +995,8 @@ namespace PlayniteGameOverlay
             _showPerformanceOverlayBackup = ShowPerformanceOverlay;
             _showScreenshotGalleryBackup = ShowScreenshotGallery;
             _showWebBrowserBackup = ShowWebBrowser;
+            _showDiscordBackup = ShowDiscord;
+            _showBatteryBackup = ShowBattery;
 
             // Backup shortcut and path values
             _recordGameplayShortcutBackup = RecordGameplayShortcut;
@@ -1053,6 +1020,8 @@ namespace PlayniteGameOverlay
             ShowPerformanceOverlay = _showPerformanceOverlayBackup;
             ShowScreenshotGallery = _showScreenshotGalleryBackup;
             ShowWebBrowser = _showWebBrowserBackup;
+            ShowDiscord = _showDiscordBackup;
+            ShowBattery = _showBatteryBackup;
 
             // Restore shortcut and path backups
             RecordGameplayShortcut = _recordGameplayShortcutBackup;

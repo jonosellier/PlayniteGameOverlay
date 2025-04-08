@@ -15,6 +15,7 @@ using Orientation = System.Windows.Controls.Orientation;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using System.Windows.Media;
 using System.Threading;
+using System.Collections.Generic;
 
 namespace PlayniteGameOverlay
 {
@@ -51,7 +52,7 @@ namespace PlayniteGameOverlay
 
         private const int DEBOUNCE_THRESHOLD = 100; // 100 milliseconds debounce threshold
 
-        public OverlayWindow(OverlaySettings settings, ButtonItem[] buttons)
+        public OverlayWindow(OverlaySettings settings)
         {
             InitializeComponent();
 
@@ -81,14 +82,101 @@ namespace PlayniteGameOverlay
             // Set initial focus to first button
             ReturnToGameButton.Focus();
             SetAspectRatio();
-            ShortcutButtons = new ObservableCollection<ButtonItem>(settings.ButtonItems);
-            CreateButtons();
+            CreateButtons(settings);
         }
 
         public ObservableCollection<ButtonItem> ShortcutButtons;
 
-        private void CreateButtons()
+        private void CreateButtons(OverlaySettings settings)
         {
+
+            List<ButtonItem> buttonItems = new List<ButtonItem>();
+
+            // Add Discord button if enabled
+            if (settings.ShowDiscord)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Discord",
+                    Path = "",
+                    IconPath = "/PlayniteGameOverlay;component/assets/discord.png",
+                    ClickAction = () => ButtonActions.FocusOrLaunchDiscord()
+                });
+            }
+
+            // Add Web Browser button if enabled
+            if (settings.ShowWebBrowser && !string.IsNullOrEmpty(settings.WebBrowserPath))
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Browser",
+                    Path = settings.WebBrowserPath,
+                    IconPath = "/PlayniteGameOverlay;component/assets/browser.png",
+                    ClickAction = () => ButtonActions.FocusOrLaunch(settings.WebBrowserPath)
+                });
+            }
+
+            // Add Record Gameplay button if enabled
+            if (settings.ShowRecordGameplay)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Toggle Recording",
+                    Path = settings.RecordGameplayShortcut,
+                    IconPath = "/PlayniteGameOverlay;component/assets/record.png",
+                    ClickAction = () => ButtonActions.ExecuteKbdShortcut(settings.RecordGameplayShortcut)
+                });
+            }
+
+            // Add Record Recent Gameplay button if enabled
+            if (settings.ShowRecordRecent)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Record Recent",
+                    Path = settings.RecordRecentShortcut,
+                    IconPath = "/PlayniteGameOverlay;component/assets/record-recent.png",
+                    ClickAction = () => ButtonActions.ExecuteKbdShortcut(settings.RecordRecentShortcut)
+                });
+            }
+
+            // Add Streaming button if enabled
+            if (settings.ShowStreaming)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Toggle Streaming",
+                    Path = settings.StreamingShortcut,
+                    IconPath = "/PlayniteGameOverlay;component/assets/stream.png",
+                    ClickAction = () => ButtonActions.ExecuteKbdShortcut(settings.StreamingShortcut)
+                });
+            }
+
+            // Add Performance Overlay button if enabled
+            if (settings.ShowPerformanceOverlay)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Toggle Performance Overlay",
+                    Path = settings.PerformanceOverlayShortcut,
+                    IconPath = "/PlayniteGameOverlay;component/assets/performance.png",
+                    ClickAction = () => ButtonActions.ExecuteKbdShortcut(settings.PerformanceOverlayShortcut)
+                });
+            }
+
+            // Add Screenshot Gallery button if enabled
+            if (settings.ShowScreenshotGallery && !string.IsNullOrEmpty(settings.ScreenshotGalleryPath))
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "View Screenshots",
+                    Path = settings.ScreenshotGalleryPath,
+                    IconPath = "/PlayniteGameOverlay;component/assets/screenshot.png",
+                    ClickAction = () => ButtonActions.FocusOrLaunch(settings.ScreenshotGalleryPath)
+                });
+            }
+
+            ShortcutButtons = new ObservableCollection<ButtonItem>(buttonItems);
 
             var hoverBrush = (SolidColorBrush)new BrushConverter().ConvertFrom("#FF363636");
             var bgBrush = new SolidColorBrush(Colors.Transparent);
@@ -105,18 +193,12 @@ namespace PlayniteGameOverlay
             foreach (var (buttonItem, idx) in ShortcutButtons.Select((value, i) => (value, i)))
             {
 
-                log("---- ButtonItem ----");
-                log($"Title:      {buttonItem.Title}");
-                log($"ActionType: {buttonItem.ActionType}");
-                log($"Path:       {buttonItem.Path}");
-                log($"IconPath:   {buttonItem.IconPath}");
-
                 // Create a Grid for layering the label over the button
                 Grid buttonGrid = new Grid
                 {
-                    Width = 64,
-                    Height = 56,
-                    Margin = idx == 0 ? new Thickness(4, -4, 4, 4) : new Thickness(16, -4, 4, 4)
+                    Width = 60,
+                    Height = 54,
+                    Margin = idx == 0 ? new Thickness(2, -4, 2, 2) : new Thickness(8, -4, 2, 2)
                 };
 
                 // Create the button with image
@@ -128,7 +210,8 @@ namespace PlayniteGameOverlay
                     ToolTip = buttonItem.Title,
                     Padding = new Thickness(0),
                     Background = bgBrush,
-                    Margin = new Thickness(0, 0, 0, 0)
+                    Margin = new Thickness(0, 0, 0, 0),
+                    Opacity = 0.7
                 };
 
                 // Add image to button
@@ -144,26 +227,23 @@ namespace PlayniteGameOverlay
                 // Create a border with rounded corners for text background
                 Border textBorder = new Border
                 {
-                    Background = (SolidColorBrush)new BrushConverter().ConvertFrom("#FF363636"),
-                    BorderBrush = (SolidColorBrush)new BrushConverter().ConvertFrom("#80808080"),
                     BorderThickness = new Thickness(1),
                     CornerRadius = new CornerRadius(4),
                     Padding = new Thickness(4, 2, 4, 2),
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, -20, 0, 10),
-                    Visibility = Visibility.Collapsed // Hidden by default
+                    Margin = new Thickness(-100, -20, -100, 10),
+                    Visibility = Visibility.Collapsed, // Hidden by default
                 };
 
                 // Create text label with white color
                 TextBlock txt = new TextBlock
                 {
-                    Text = buttonItem.Title,
+                    Text = buttonItem.Title.ToUpper(),
+                    FontWeight = FontWeights.Bold,
                     TextAlignment = TextAlignment.Center,
                     TextWrapping = TextWrapping.NoWrap, // Allow multi-line wrapping
                     FontSize = 10,
                     Foreground = (SolidColorBrush)new BrushConverter().ConvertFrom("#FFD0D0D0"),
-                    MinWidth = 48,  // Allow expansion beyond button
-                    MaxWidth = 200, // Adjust this based on preference
                     TextTrimming = TextTrimming.CharacterEllipsis // Optional: Prevent overflow issues
 
                 };
@@ -177,22 +257,32 @@ namespace PlayniteGameOverlay
                 btn.MouseEnter += (sender, e) => {
                     textBorder.Visibility = Visibility.Visible;
                     btn.Background = hoverBrush;
+                    btn.Opacity = 1;
+
                 };
                 btn.MouseLeave += (sender, e) => {
                     textBorder.Visibility = Visibility.Collapsed;
                     btn.Background = bgBrush;
+                    btn.Opacity = 0.7;
+
                 };
                 btn.GotFocus += (sender, e) => {
                     textBorder.Visibility = Visibility.Visible;
                     btn.Background = hoverBrush;
+                    btn.Opacity = 1;
                 };
                 btn.LostFocus += (sender, e) => { 
                     textBorder.Visibility = Visibility.Collapsed;
                     btn.Background = bgBrush;
+                    btn.Opacity = 0.7;
                 };
 
                 // Add click handler
-                btn.Click += (sender, e) => Button_Click(sender, e, buttonItem);
+                btn.Click += (sender, e) =>
+                {
+                    ReturnToGameButton_Click(sender, e);
+                    buttonItem.ClickAction?.Invoke();
+                };
 
                 // Add elements to grid
                 buttonGrid.Children.Add(btn);     // Button at the bottom
@@ -200,128 +290,6 @@ namespace PlayniteGameOverlay
 
                 // Add the grid to panel
                 buttonPanel.Children.Add(buttonGrid);
-            }
-        }
-
-        private void Button_Click(object sender, RoutedEventArgs e, ButtonItem buttonItem)
-        {
-            // Handle button click based on ActionType
-
-            Hide(); // Hide the overlay after button click
-            try
-            {
-                switch (buttonItem.ActionType)
-                {
-                    case ButtonAction.Directory:
-                        // Check if the folder is already open in Explorer
-                        bool folderFound = IsFolderOpen(buttonItem.Path);
-
-                        if (folderFound)
-                        {
-                            // Folder is already open, focus was handled in the IsFolderOpen method
-                        }
-                        else
-                        {
-                            // Open the folder in a new Explorer window
-                            System.Diagnostics.Process.Start("explorer.exe", buttonItem.Path);
-                        }
-                        break;
-                    case ButtonAction.Executable:
-                        // Get the filename without path
-                        string fileName = System.IO.Path.GetFileName(buttonItem.Path);
-
-                        // Try to find a running process with this name
-                        bool processFound = false;
-
-                        try
-                        {
-                            // Get all processes with the same name (without extension)
-                            string processName = System.IO.Path.GetFileNameWithoutExtension(fileName);
-                            System.Diagnostics.Process[] processes = System.Diagnostics.Process.GetProcessesByName(processName);
-
-                            if (processes.Length > 0)
-                            {
-                                processFound = true;
-
-                                // Try to bring the window to the foreground
-                                foreach (var process in processes)
-                                {
-                                    try
-                                    {
-                                        // Get the main window handle
-                                        IntPtr handle = process.MainWindowHandle;
-
-                                        if (handle != IntPtr.Zero)
-                                        {
-                                            // Restore window if minimized
-                                            ShowWindow(handle, SW_MAXIMIZE);
-
-                                            // Bring to foreground
-                                            SetForegroundWindow(handle);
-
-                                            break; // Exit after focusing the first valid window
-                                        }
-                                    }
-                                    catch
-                                    {
-                                        // Continue to the next process if this one fails
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"Error checking for existing process: {ex.Message}");
-                        }
-
-                        // If no running process was found or focused, start a new one
-                        if (!processFound)
-                        {
-                            System.Diagnostics.Process.Start(buttonItem.Path);
-                        }
-                        break;
-                    case ButtonAction.Uri:
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = buttonItem.Path,
-                            UseShellExecute = true
-                        });
-                        break;
-                    case ButtonAction.KeyboardShortcut:
-                        Hide(); // Hide the overlay before shortcut
-                        Thread.Sleep(1500);
-                        SendKeys.SendWait(buttonItem.Path);
-                        break;
-                    case ButtonAction.Shortcut:
-                        // Check if the shortcut is a valid executable
-                        if (System.IO.File.Exists(buttonItem.Path))
-                        {
-                            var startInfo = new ProcessStartInfo
-                            {
-                                FileName = buttonItem.Path,
-                                UseShellExecute = true, // Ensures the system handles the .lnk properly
-                            };
-
-                            // Ensure the path is correctly quoted in case it has spaces
-                            if (buttonItem.Path.Contains(" "))
-                            {
-                                startInfo.Arguments = $"\"{buttonItem.Path}\"";
-                            }
-
-                            Process.Start(startInfo);
-                        }
-                        else
-                        {
-                            log($"Shortcut not found: {buttonItem.Path}", "SHORTCUT_ERROR");
-                        }
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                log($"Error executing button action: {ex.Message}\n\n {buttonItem.Path}", "BUTTON_ERROR");
-                this.Show();
             }
         }
 

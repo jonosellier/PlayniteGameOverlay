@@ -18,25 +18,35 @@ namespace PlayniteGameOverlay
                 Process[] processes = Process.GetProcessesByName("Discord");
                 if (processes.Length > 0)
                 {
-                    processFound = true;
 
                     // Try to bring the window to the foreground
                     foreach (var process in processes)
                     {
                         try
                         {
+
+                            Debug.WriteLine($"Try to show {process.ProcessName}");
                             // Get the main window handle
                             IntPtr handle = process.MainWindowHandle;
 
                             if (handle != IntPtr.Zero)
                             {
                                 // Restore window if minimized
-                                ShowWindow(handle, SW_MAXIMIZE);
+                                var shown = ShowWindow(handle, SW_MAXIMIZE);
 
                                 // Bring to foreground
-                                SetForegroundWindow(handle);
+                                var fg = SetForegroundWindow(handle);
 
-                                break; // Exit after focusing the first valid window
+                                if (fg && shown)
+                                {
+                                    Debug.WriteLine($"Shown");
+                                    processFound = true;
+                                    break;
+                                }
+                                Debug.WriteLine($"Show failed {shown}, {fg}");
+
+
+
                             }
                         }
                         catch
@@ -55,6 +65,7 @@ namespace PlayniteGameOverlay
             // If no running process was found or focused, start discord via URI
             if (!processFound)
             {
+                Debug.WriteLine($"Launching discord via URI");
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = @"discord://-/",

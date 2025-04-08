@@ -247,7 +247,7 @@ Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l
             <TextBlock x:Name="UnlockPercent" HorizontalAlignment="Left" Margin="60,485,0,0" TextWrapping="Wrap" Text="Unlocked 123/456 Achievements" VerticalAlignment="Top" Foreground="White" FontWeight="Bold"/>
             <Border Background="#FF242424" CornerRadius="10" x:Name="ShortcutBar"
         MinWidth="64" MinHeight="64" VerticalAlignment="Bottom" HorizontalAlignment="Left" 
-        BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="8,8,8,8" Margin="40,0,0,20">
+        BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="4,4,4,4" Margin="40,0,0,20">
                 <ItemsControl x:Name="ButtonItemsControl" ItemsSource="{Binding ShortcutButtons}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
