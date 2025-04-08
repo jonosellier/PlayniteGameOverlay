@@ -20,4 +20,11 @@ Packages:
     PackageUrl: https://github.com/jonosellier/PlayniteGameOverlay/releases/download/v0.3.0/PlayniteGameOverlay_fc75626e-ec69-4287-972a-b86298555ebb_0_3_0.pext
     Changelog:
       - Added square and landscape game cover support
-      - Fix infinite "Addon Update Available notification" 
+      - Fix infinite "Addon Update Available notification"
+  - Version: 0.3.1
+    RequiredApiVersion: 6.11.0.0
+    ReleaseDate: 2025-04-07
+    PackageUrl: https://github.com/jonosellier/PlayniteGameOverlay/releases/download/v0.3.1/PlayniteGameOverlay_fc75626e-ec69-4287-972a-b86298555ebb_0_3_1.pext
+    Changelog:
+      - Fixed Show Playnite behavior when Playnite is minimized to system tray
+      - Auto launch playnite in fullscreen mode when launched from the controller

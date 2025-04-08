@@ -141,9 +141,9 @@ namespace PlayniteGameOverlay
             keyboardHook = new GlobalKeyboardHook();
             keyboardHook.KeyPressed += OnKeyPressed;
             InitializeController();
-            if (controllerTimer != null)
+            if (controllerTimerFast != null)
             {
-                controllerTimer.Stop();
+                controllerTimerFast.Stop(); // disable fast polling till game started
             }
         }
 
@@ -212,9 +212,13 @@ namespace PlayniteGameOverlay
                 var gameOverlayData = CreateGameOverlayData(args.Game, args.StartedProcessId, gameStarted);
                 GameOverlayData = gameOverlayData;
                 overlayWindow.UpdateGameOverlay(gameOverlayData);
-                if (controllerTimer != null)
+                if (controllerTimerFast != null)
                 {
-                    controllerTimer.Start();
+                    controllerTimerFast.Start(); // start fast timer
+                }
+                if (controllerTimerSlow != null)
+                {
+                    controllerTimerSlow.Stop(); // disable slow polling
                 }
             }
             catch (Exception ex)
@@ -227,9 +231,13 @@ namespace PlayniteGameOverlay
         {
             overlayWindow.UpdateGameOverlay(null);
             GameOverlayData = null;
-            if (controllerTimer != null)
+            if (controllerTimerFast != null)
             {
-                controllerTimer.Stop();
+                controllerTimerFast.Stop(); // stop fast polling
+            }
+            if (controllerTimerSlow != null)
+            {
+                controllerTimerSlow.Start(); // start slow polling
             }
         }
 
@@ -494,34 +502,40 @@ namespace PlayniteGameOverlay
 
         private void log(string msg, string tag = "DEBUG")
         {
-            if (Settings.DebugMode)
+            if (true)
             {
                 Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
             }
             logger.Debug(msg);
         }
 
-
         private void ShowPlaynite()
+        {
+            ShowPlaynite(false);
+        }
+        private void ShowPlaynite(bool forceFullscreen = false)
         {
             try
             {
-                Process[] processes = Process.GetProcessesByName("Playnite.DesktopApp");
-                if (processes.Length == 0)
+                // If fullscreen is forced, just launch it. It will either focus the existing app or switch to fullscreen
+                if (forceFullscreen)
                 {
-                    processes = Process.GetProcessesByName("Playnite.FullscreenApp");
+                    Process.Start(Path.Combine(playniteAPI.Paths.ApplicationPath, "Playnite.FullscreenApp.exe"));
+                    return;
                 }
-
+                // Try desktop first
+                Process[] processes = Process.GetProcessesByName("Playnite.DesktopApp");
+                if(processes.Length > 0)
+                {
+                    Process.Start(Path.Combine(playniteAPI.Paths.ApplicationPath, "Playnite.DesktopApp.exe"));
+                    return;
+                }
+                // Then try fullscreen
+                processes = Process.GetProcessesByName("Playnite.FullscreenApp");
                 if (processes.Length > 0)
                 {
-                    // Use the Win32 API calls you already have to activate the window
-                    Process proc = processes[0];
-                    if (IsIconic(proc.MainWindowHandle))
-                    {
-                        ShowWindow(proc.MainWindowHandle, SW_RESTORE);
-                    }
-                    SetForegroundWindow(proc.MainWindowHandle);
-                    log("Activated Playnite process: " + proc.ProcessName);
+                    Process.Start(Path.Combine(playniteAPI.Paths.ApplicationPath, "Playnite.FullscreenApp.exe"));
+                    return;
                 }
                 else
                 {
@@ -589,7 +603,8 @@ namespace PlayniteGameOverlay
 
         private bool sdlInitialized = false;
         private int controllerId = -1;
-        private DispatcherTimer controllerTimer;
+        private DispatcherTimer controllerTimerFast;
+        private DispatcherTimer controllerTimerSlow;
 
         private void InitializeController()
         {
@@ -642,12 +657,17 @@ namespace PlayniteGameOverlay
                     return;
                 }
 
-                // Set up controller polling timer (poll @ 120Hz)
                 log("Setting up controller polling timer", "SDL_GLOBAL");
-                controllerTimer = new DispatcherTimer();
-                controllerTimer.Interval = TimeSpan.FromMilliseconds(8);
-                controllerTimer.Tick += PollControllerInput;
-                controllerTimer.Start();
+                // Set up controller polling timer (poll @ 120Hz)
+                controllerTimerFast = new DispatcherTimer();
+                controllerTimerFast.Interval = TimeSpan.FromMilliseconds(8);
+                controllerTimerFast.Tick += PollControllerInput;
+                controllerTimerFast.Start();
+                // same timer at 30Hz for slower polling
+                controllerTimerSlow = new DispatcherTimer();
+                controllerTimerSlow.Interval = TimeSpan.FromMilliseconds(32);
+                controllerTimerSlow.Tick += PollControllerInput;
+                controllerTimerSlow.Start();
                 log("Controller polling timer started", "SDL_GLOBAL");
             }
             catch (Exception ex)
@@ -664,6 +684,14 @@ namespace PlayniteGameOverlay
                 SDL.SDL_GameControllerClose(controller);
                 controller = IntPtr.Zero;
                 log("Controller closed", "SDL_GLOBAL");
+            }
+            if (controllerTimerFast != null)
+            {
+                controllerTimerFast.Stop(); // disable fast polling
+            }
+            if (controllerTimerSlow != null)
+            {
+                controllerTimerSlow.Stop(); // disable slow polling
             }
         }
 
@@ -718,7 +746,7 @@ namespace PlayniteGameOverlay
                         ShowGameOverlay(runningGame);
                 } else
                 {
-                    log("No running game found to show overlay", "WARNING");
+                    ShowPlaynite(true);
                 }
             }
         }
