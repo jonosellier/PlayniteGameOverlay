@@ -131,17 +131,17 @@ namespace PlayniteGameOverlay
             {
                 var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
 
-                //if (runningGame != null)
-                //{
+                if (runningGame != null)
+                {
                     if (overlayWindow.IsVisible)
                         overlayWindow.Hide();
                     else
                         ShowGameOverlay(runningGame);
-                //}
-                //else
-                //{
-                //    ShowPlaynite();
-                //}
+                }
+                else
+                {
+                    ShowPlaynite();
+                }
             }
 
             // Escape to hide overlay
