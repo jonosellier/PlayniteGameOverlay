@@ -32,6 +32,8 @@ namespace PlayniteGameOverlay
 
         public override Guid Id { get; } = Guid.Parse("fc75626e-ec69-4287-972a-b86298555ebb");
 
+        private Logger _logger;
+
         DateTime gameStarted;
 
         // SuccessStory integration
@@ -47,16 +49,16 @@ namespace PlayniteGameOverlay
 
                 if (isSuccessStoryAvailable)
                 {
-                    log("SuccessStory plugin detected, achievement integration enabled");
+                    _logger.Log("SuccessStory plugin detected, achievement integration enabled");
                 }
                 else
                 {
-                    log("SuccessStory plugin not found, achievement integration disabled");
+                    _logger.Log("SuccessStory plugin not found, achievement integration disabled");
                 }
             }
             catch (Exception ex)
             {
-                log($"Error checking for SuccessStory plugin: {ex.Message}", "ERROR");
+                _logger.Log($"Error checking for SuccessStory plugin: {ex.Message}", "ERROR");
                 isSuccessStoryAvailable = false;
             }
         }
@@ -74,6 +76,8 @@ namespace PlayniteGameOverlay
         {
             logger.Info("Starting Overlay Extension...");
 
+            _logger = new Logger(settings?.DebugMode ?? false);
+
             // Check if SuccessStory is installed
             CheckSuccessStoryAvailability();
 
@@ -88,10 +92,6 @@ namespace PlayniteGameOverlay
             keyboardHook = new GlobalKeyboardHook();
             keyboardHook.KeyPressed += OnKeyPressed;
             InitializeController();
-            if (controllerTimerFast != null)
-            {
-                controllerTimerFast.Stop(); // disable fast polling till game started
-            }
         }
 
         public void ReloadOverlay(OverlaySettings settings)
@@ -115,13 +115,6 @@ namespace PlayniteGameOverlay
             // Cleanup resources
             overlayWindow?.Close();
             keyboardHook?.Dispose();
-            // Clean up SDL
-            if (sdlInitialized)
-            {
-                SDL.SDL_Quit();
-                sdlInitialized = false;
-            }
-            CloseController();
         }
 
         private void OnKeyPressed(Keys key, bool altPressed)
@@ -130,7 +123,8 @@ namespace PlayniteGameOverlay
             if (altPressed && key == Keys.Oem3)
             {
                 var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
-
+                //ShowGameOverlay(runningGame);
+                //return;
                 if (runningGame != null)
                 {
                     if (overlayWindow.IsVisible)
@@ -159,14 +153,6 @@ namespace PlayniteGameOverlay
                 var gameOverlayData = CreateGameOverlayData(args.Game, args.StartedProcessId, gameStarted);
                 GameOverlayData = gameOverlayData;
                 overlayWindow.UpdateGameOverlay(gameOverlayData);
-                if (controllerTimerFast != null)
-                {
-                    controllerTimerFast.Start(); // start fast timer
-                }
-                if (controllerTimerSlow != null)
-                {
-                    controllerTimerSlow.Stop(); // disable slow polling
-                }
             }
             catch (Exception ex)
             {
@@ -178,14 +164,6 @@ namespace PlayniteGameOverlay
         {
             overlayWindow.UpdateGameOverlay(null);
             GameOverlayData = null;
-            if (controllerTimerFast != null)
-            {
-                controllerTimerFast.Stop(); // stop fast polling
-            }
-            if (controllerTimerSlow != null)
-            {
-                controllerTimerSlow.Start(); // start slow polling
-            }
         }
 
         private void ShowGameOverlay(Game game)
@@ -216,7 +194,7 @@ namespace PlayniteGameOverlay
 
         private List<AchievementData> GetGameAchievements(Game game)
         {
-            log($"Retrieving achievements for game {game.Name} (ID: {game.Id}, SuccessStory Enabled: {isSuccessStoryAvailable})");
+            _logger.Log($"Retrieving achievements for game {game.Name} (ID: {game.Id}, SuccessStory Enabled: {isSuccessStoryAvailable})");
             var achievements = new List<AchievementData>();
 
             if (!isSuccessStoryAvailable || game == null)
@@ -305,7 +283,7 @@ namespace PlayniteGameOverlay
                     }
                     gameExecutables.AddRange(additionalNames);
 
-                    log($"Found {gameExecutables.Count} potential game executables in {game.InstallDirectory}");
+                    _logger.Log($"Found {gameExecutables.Count} potential game executables in {game.InstallDirectory}");
                 }
                 catch (Exception ex)
                 {
@@ -317,7 +295,7 @@ namespace PlayniteGameOverlay
                 string[] gameNameWords = gameName.ToLower().Split(new char[] { ' ', '-', '_', ':', '.', '(', ')', '[', ']' },
                     StringSplitOptions.RemoveEmptyEntries);
 
-                log($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
+                _logger.Log($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
 
                 // Get all processes with main window
                 Process[] allProcesses = Process.GetProcesses()
@@ -411,7 +389,7 @@ namespace PlayniteGameOverlay
                 if (candidates.Count > 0)
                 {
                     var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
-                    log($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    _logger.Log($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
                     return bestMatch;
                 }
 
@@ -421,39 +399,30 @@ namespace PlayniteGameOverlay
                     var bestMatch = titleMatchCandidates.OrderByDescending(t => t.MatchCount)
                                                         .ThenByDescending(t => t.Process.WorkingSet64)
                                                         .First().Process;
-                    log($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
+                    _logger.Log($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
                     return bestMatch;
                 }
 
                 if (nameMatchCandidates.Count > 0)
                 {
                     var bestMatch = nameMatchCandidates.OrderByDescending(p => p.WorkingSet64).First();
-                    log($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    _logger.Log($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
                     return bestMatch;
                 }
 
                 if (inaccessibleCandidates.Count > 0)
                 {
                     var bestGuess = inaccessibleCandidates.OrderByDescending(p => p.WorkingSet64).First();
-                    log($"Using best guess process: {bestGuess.ProcessName} (ID: {bestGuess.Id})");
+                    _logger.Log($"Using best guess process: {bestGuess.ProcessName} (ID: {bestGuess.Id})");
                     return bestGuess;
                 }
             }
             catch (Exception ex)
             {
-                log($"Error finding game process: {ex.Message}", "ERROR");
+                _logger.Log($"Error finding game process: {ex.Message}", "ERROR");
             }
 
             return null;
-        }
-
-        private void log(string msg, string tag = "DEBUG")
-        {
-            if (true)
-            {
-                Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
-            }
-            logger.Debug(msg);
         }
 
         private void ShowPlaynite()
@@ -486,7 +455,7 @@ namespace PlayniteGameOverlay
                 }
                 else
                 {
-                    log("Could not find any Playnite process to activate", "WARNING");
+                    _logger.Log("Could not find any Playnite process to activate", "WARNING");
                 }
             }
             catch (Exception ex)
@@ -535,168 +504,89 @@ namespace PlayniteGameOverlay
                     });
                 }
 
-                log($"Successfully parsed {achievements.Count} achievements from SuccessStory");
+                _logger.Log($"Successfully parsed {achievements.Count} achievements from SuccessStory");
             }
             catch (Exception ex)
             {
-                log($"Error parsing SuccessStory file: {ex.Message}", "ERROR");
+                _logger.Log($"Error parsing SuccessStory file: {ex.Message}", "ERROR");
             }
 
             return achievements;
         }
 
         #region SDL2
-        private IntPtr controller = IntPtr.Zero;
-
-        private bool sdlInitialized = false;
-        private int controllerId = -1;
-        private DispatcherTimer controllerTimerFast;
-        private DispatcherTimer controllerTimerSlow;
-
         private void InitializeController()
         {
-            try
-            {
-                log("Initializing SDL controller support", "SDL_GLOBAL");
+            // Initialize singleton with your logger
+            ControllerManager.Initialize(settings.DebugMode);
 
-                // Initialize SDL with game controller support
-                if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER) < 0)
-                {
-                    string error = SDL.SDL_GetError();
-                    log($"SDL_GLOBAL could not initialize! SDL Error: {error}", "SDL_GLOBAL_ERROR");
-                    return;
-                }
-
-                sdlInitialized = true;
-                log("SDL_GLOBAL initialized successfully", "SDL_GLOBAL");
-
-                // Look for connected controllers
-                int numJoysticks = SDL.SDL_NumJoysticks();
-                log($"Found {numJoysticks} joysticks/controllers", "SDL_GLOBAL");
-
-                // Try to find a connected compatible controller
-                for (int i = 0; i < numJoysticks; i++)
-                {
-                    if (SDL.SDL_IsGameController(i) == SDL.SDL_bool.SDL_TRUE)
-                    {
-                        controllerId = i;
-                        log($"Found compatible game controller at index {i}", "SDL_GLOBAL");
-
-                        // Open the controller here, and keep it open
-                        controller = SDL.SDL_GameControllerOpen(controllerId);
-                        if (controller == IntPtr.Zero)
-                        {
-                            log($"Could not open controller! SDL Error: {SDL.SDL_GetError()}", "SDL_GLOBAL_ERROR");
-                            return;
-                        }
-
-                        // Optional: Log controller mapping
-                        string mapping = SDL.SDL_GameControllerMapping(controller);
-                        log($"Controller mapping: {mapping}", "SDL_GLOBAL_DEBUG");
-
-                        break;
-                    }
-                }
-
-                if (controllerId == -1)
-                {
-                    log("No compatible game controllers found", "SDL_GLOBAL");
-                    return;
-                }
-
-                log("Setting up controller polling timer", "SDL_GLOBAL");
-                // Set up controller polling timer (poll @ 120Hz)
-                controllerTimerFast = new DispatcherTimer();
-                controllerTimerFast.Interval = TimeSpan.FromMilliseconds(8);
-                controllerTimerFast.Tick += PollControllerInput;
-                controllerTimerFast.Start();
-                // same timer at 30Hz for slower polling
-                controllerTimerSlow = new DispatcherTimer();
-                controllerTimerSlow.Interval = TimeSpan.FromMilliseconds(32);
-                controllerTimerSlow.Tick += PollControllerInput;
-                controllerTimerSlow.Start();
-                log("Controller polling timer started", "SDL_GLOBAL");
-            }
-            catch (Exception ex)
-            {
-                log($"Error initializing SDL: {ex.Message}", "SDL_GLOBAL_ERROR");
-                log($"Stack trace: {ex.StackTrace}", "SDL_GLOBAL_ERROR");
-            }
+            // Subscribe to controller events
+            ControllerManager.Instance.ControllerAction += OnControllerAction;
         }
 
-        private void CloseController()
-        {
-            if (controller != IntPtr.Zero)
-            {
-                SDL.SDL_GameControllerClose(controller);
-                controller = IntPtr.Zero;
-                log("Controller closed", "SDL_GLOBAL");
-            }
-            if (controllerTimerFast != null)
-            {
-                controllerTimerFast.Stop(); // disable fast polling
-            }
-            if (controllerTimerSlow != null)
-            {
-                controllerTimerSlow.Stop(); // disable slow polling
-            }
-        }
 
-        private void PollControllerInput(object sender, EventArgs e)
+        private void OnControllerAction(object sender, ControllerEventArgs e)
         {
-            // Ensure that the controller is initialized and opened
-            if (controller == IntPtr.Zero)
-            {
-                log("Controller not open, skipping polling", "SDL_GLOBAL");
+            // We only want to process pressed events, not repeated or released
+            if (e.EventType != ControllerEventType.Pressed)
                 return;
+
+            // For Start+Back combination or Guide button handling
+            if (e.ButtonName == "Start" || e.ButtonName == "Back" || e.ButtonName == "Guide")
+            {
+                // Keep track of button states
+                if (e.ButtonName == "Start")
+                    _startPressed = true;
+                else if (e.ButtonName == "Back")
+                    _backPressed = true;
+                else if (e.ButtonName == "Guide")
+                    _guidePressed = true;
+
+                // Check for Start+Back combination
+                bool startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
+                                     _startPressed && _backPressed;
+
+                // Check for Guide press
+                bool guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
+                                     _guidePressed;
+
+                // Process the shortcut if either condition is met
+                if (startBackCombo || guideActivated)
+                {
+                    // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
+                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
+                        var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+                        if (runningGame != null)
+                        {
+                            if (overlayWindow.IsVisible)
+                                overlayWindow.Hide();
+                            else
+                                ShowGameOverlay(runningGame);
+                        }
+                        else
+                        {
+                            ShowPlaynite(true);
+                        }
+                    }));
+                }
             }
 
-            // Process SDL events (optional, but can be useful for other input events)
-            SDL.SDL_Event sdlEvent;
-            while (SDL.SDL_PollEvent(out sdlEvent) != 0)
+            // Reset button state on release
+            if (e.EventType == ControllerEventType.Released)
             {
-                log($"SDL_GLOBAL event type: {sdlEvent.type}", "SDL_GLOBAL_EVENT");
-
-                // You can add handling for other event types if needed, such as controller device additions/removals
-                if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEADDED)
-                {
-                    log($"Controller device added: {sdlEvent.cdevice.which}", "SDL_GLOBAL_EVENT");
-                }
-                else if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEREMOVED)
-                {
-                    log($"Controller device removed: {sdlEvent.cdevice.which}", "SDL_GLOBAL_EVENT");
-                }
-            }
-
-            // Update the controller's state (fetch input states like button presses, axis movements, etc.)
-            SDL.SDL_GameControllerUpdate();
-
-            // Check if the A button is pressed (used for selection)
-            bool startPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_START) == 1;
-
-            // Check if the B button is pressed (used for hiding the overlay)
-            bool backPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_BACK) == 1;
-
-            bool guidePressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_GUIDE) == 1;
-
-            if (
-                (Settings.ControllerShortcut == ControllerShortcut.StartBack && startPressed && backPressed)
-                || (Settings.ControllerShortcut == ControllerShortcut.Guide && guidePressed)
-                )
-            {
-                var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
-                if (runningGame != null)
-                {
-                    if (overlayWindow.IsVisible)
-                        overlayWindow.Hide();
-                    else
-                        ShowGameOverlay(runningGame);
-                } else
-                {
-                    ShowPlaynite(true);
-                }
+                if (e.ButtonName == "Start")
+                    _startPressed = false;
+                else if (e.ButtonName == "Back")
+                    _backPressed = false;
+                else if (e.ButtonName == "Guide")
+                    _guidePressed = false;
             }
         }
+
+        // Class-level fields to track button states
+        private bool _startPressed = false;
+        private bool _backPressed = false;
+        private bool _guidePressed = false;
 
         #endregion
 

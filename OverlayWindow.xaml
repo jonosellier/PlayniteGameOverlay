@@ -1,15 +1,28 @@
 <Window
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:av="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:PlayniteGameOverlay" mc:Ignorable="av" x:Class="PlayniteGameOverlay.OverlayWindow"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+        xmlns:av="http://schemas.microsoft.com/expression/blend/2008" 
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+        xmlns:local="clr-namespace:PlayniteGameOverlay"
+        xmlns:sys="clr-namespace:System.Windows;assembly=PresentationFramework"
+        mc:Ignorable="d av"
+        d:DataContext="{d:DesignInstance Type=local:OverlayWindowViewModel, IsDesignTimeCreatable=True}"
+        x:Class="PlayniteGameOverlay.OverlayWindow"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"
         ResizeMode="NoResize"
         WindowState="Maximized"
-        ShowInTaskbar="False" av:DesignHeight="900" av:DesignWidth="1600" Width="1600">
+        ShowInTaskbar="False" 
+        av:DesignHeight="900" 
+        av:DesignWidth="1600" 
+        Width="1600">
 
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
 
     <Viewbox Stretch="Uniform">
         <!-- Set a container with fixed aspect ratio -->
@@ -23,12 +36,13 @@
                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" Width="260">
                     <!-- Windows 11 style buttons with icons -->
                     <Button x:Name="ReturnToGameButton" Height="70" Width="260" 
-            Foreground="White" FontSize="20" FontWeight="SemiBold"
-            BorderThickness="0" Padding="20,10" Margin="0,0,0,20">
+                        Foreground="White" FontSize="20" FontWeight="SemiBold"
+                        BorderThickness="0" Padding="20,10" Margin="0,0,0,20"
+                        Command="{Binding ReturnToGameCommand}">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                                 <Path Data="M10,17V14H3V10H10V7L15,12L10,17M10,2H19A2,2 0 0,1 21,4V20A2,2 0 0,1 19,22H10A2,2 0 0,1 8,20V18H10V20H19V4H10V6H8V4A2,2 0 0,1 10,2Z" 
-                      Fill="White" Width="24" Height="24" Stretch="Uniform" Margin="-3,0,18,0"/>
+                                      Fill="White" Width="24" Height="24" Stretch="Uniform" Margin="-3,0,18,0"/>
                                 <TextBlock Text="Return to Game" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button.Content>
@@ -62,12 +76,13 @@
                     </Button>
 
                     <Button x:Name="ShowPlayniteButton" Height="70" Width="260" 
-            Foreground="White" FontSize="20" FontWeight="SemiBold"
-            BorderThickness="0" Padding="20,10" Margin="0,0,0,20">
+                        Foreground="White" FontSize="20" FontWeight="SemiBold"
+                        BorderThickness="0" Padding="20,10" Margin="0,0,0,20"
+                        Command="{Binding ShowPlayniteCommand}">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                                 <Path Data="M 53.760 28.496 C 33.560 33.609, 22.270 49.113, 11.485 86.552 C -1.871 132.917, -3.512 171.688, 7.418 182.618 C 16.377 191.577, 28.929 186.235, 46.444 166.008 C 62.325 147.668, 61.688 147.872, 105 147.265 C 154.990 146.565, 161.600 147.871, 172.538 160.607 C 189.871 180.789, 199.516 187.766, 208.662 186.735 C 216.030 185.904, 219.883 181.093, 222.732 169.164 C 224.636 161.195, 225.526 144.474, 224.201 141.570 C 223.682 140.432, 222.519 134.006, 221.617 127.291 C 219.719 113.165, 213.465 87.415, 208.356 72.695 C 199.166 46.216, 187.888 33.071, 170.465 28.533 C 161.863 26.292, 157.859 26.596, 142.413 30.662 C 129.121 34.161, 127.763 34.325, 112 34.345 C 96.501 34.365, 94.772 34.170, 83.500 31.129 C 69.024 27.224, 61.441 26.552, 53.760 28.496 M 157 61.709 C 149.546 64.450, 149.583 75.265, 157.055 77.869 C 164.461 80.451, 171.088 72.939, 167.509 66.018 C 165.420 61.978, 161.094 60.204, 157 61.709 M 37.840 74.887 C 21.794 85.062, 29.010 110, 48 110 C 59.143 110, 67 102.143, 67 91 C 67 79.736, 59.157 72, 47.736 72 C 43.562 72, 41.394 72.632, 37.840 74.887 M 132.923 84.923 C 128.823 89.023, 128.883 93.882, 133.077 97.411 C 136.757 100.507, 140.807 100.727, 144.253 98.016 C 149.230 94.101, 148.515 86.352, 142.909 83.453 C 138.733 81.293, 136.177 81.670, 132.923 84.923 M 174.923 84.923 C 172.928 86.918, 172 88.848, 172 91 C 172 94.937, 176.712 100, 180.376 100 C 189.075 100, 193.099 90.945, 187.077 84.923 C 183.147 80.993, 178.853 80.993, 174.923 84.923 M 153.923 105.923 C 148.967 110.879, 150.248 117.952, 156.580 120.598 C 159.544 121.836, 160.456 121.836, 163.420 120.598 C 169.752 117.952, 171.033 110.879, 166.077 105.923 C 162.147 101.993, 157.853 101.993, 153.923 105.923 M 0.370 153 C 0.370 158.775, 0.535 161.137, 0.737 158.250 C 0.939 155.363, 0.939 150.637, 0.737 147.750 C 0.535 144.863, 0.370 147.225, 0.370 153" 
-                      Fill="White" Width="28" Height="24" Stretch="Uniform" Margin="-2,0,15,0"/>
+                                      Fill="White" Width="28" Height="24" Stretch="Uniform" Margin="-2,0,15,0"/>
                                 <TextBlock Text="Show Playnite" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button.Content>
@@ -100,8 +115,9 @@
                         </Button.Style>
                     </Button>
                     <Button x:Name="CloseGameButton" Height="70" Width="260" 
-            Foreground="White" FontSize="20" FontWeight="SemiBold"
-            BorderThickness="0" Padding="20,10">
+                        Foreground="White" FontSize="20" FontWeight="SemiBold"
+                        BorderThickness="0" Padding="20,10"
+                        Command="{Binding CloseGameCommand}">
                         <Button.Resources>
                             <Style TargetType="{x:Type Border}">
                                 <Setter Property="CornerRadius" Value="8"/>
@@ -131,7 +147,7 @@
                         </Button.Style>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                             <Path Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" 
-                      Fill="White" Width="20" Height="20" Stretch="Uniform" Margin="2,0,17,0"/>
+                                Fill="White" Width="20" Height="20" Stretch="Uniform" Margin="2,0,17,0"/>
                             <TextBlock Text="Exit Game" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -139,30 +155,30 @@
             </Border>
 
             <!-- Content container -->
-            <TextBlock x:Name="GameTitle" Foreground="White" FontWeight="Bold" HorizontalAlignment="Left" 
-                           Margin="36,4,0,0" Height="56" VerticalAlignment="Top" FontSize="36" Width="1309"><Run Text="Game Name Here"/><LineBreak/><Run/></TextBlock>
+            <TextBlock x:Name="GameTitle" Text="{Binding GameTitle}" Foreground="White" FontWeight="Bold" HorizontalAlignment="Left" 
+                           Margin="36,4,0,0" Height="56" VerticalAlignment="Top" FontSize="36" Width="1309"/>
             <Border x:Name="OuterImgBorder" BorderBrush="#80808080" BorderThickness="1,1,1,1" Width="377" Height="527" Margin="0,120,36,0" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="8,8,8,8" Background="#80808080">
                 <Border x:Name="InnerImgBorder" BorderBrush="#80808080" BorderThickness="0,0,0,0" Width="375" Height="525" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="7,7,7,7" Margin="0,0,0,0">
                     <Border.Clip>
                         <RectangleGeometry RadiusX="7" RadiusY="7" Rect="0,0,375,525" x:Name="ImgBorderClip"/>
                     </Border.Clip>
-                    <Image x:Name="GameCoverImage" 
-           Stretch="UniformToFill" Width="375" Height="525" VerticalAlignment="Center" HorizontalAlignment="Center" Source="/PlayniteGameOverlay;component/917bd40b-a43c-439f-848c-2f82b49d8590.jpg"/>
+                    <Image x:Name="GameCoverImage" Source="{Binding CoverImagePath}"
+                           Stretch="UniformToFill" Width="375" Height="525" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                 </Border>
             </Border>
             <!-- Clock -->
-            <TextBlock x:Name="Clock" Foreground="White" FontWeight="Bold" HorizontalAlignment="Right" 
-                   Margin="0,5,36,0" VerticalAlignment="Top" FontSize="24" Text="12:34" Width="74" TextAlignment="Right" />
+            <TextBlock x:Name="Clock" Text="{Binding CurrentTime}" Foreground="White" FontWeight="Bold" HorizontalAlignment="Right" 
+                       Margin="0,5,36,0" VerticalAlignment="Top" FontSize="24" Width="74" TextAlignment="Right" />
 
-            <Grid x:Name="Battery">
-                <Rectangle x:Name="BatteryBar"  HorizontalAlignment="Right" Height="17" Margin="0,13,127,0" Fill="#FF48AF30" VerticalAlignment="Top" Width="37"/>
+            <Grid x:Name="Battery" Visibility="{Binding HasBattery, Converter={StaticResource BoolToVis}}">
+                <Rectangle x:Name="BatteryBar" HorizontalAlignment="Right" Height="17" Margin="0,13,127,0" Fill="#FF48AF30" VerticalAlignment="Top" Width="{Binding BatteryBarWidth}"/>
                 <Rectangle HorizontalAlignment="Right" Height="17" Margin="0,13,121,0" Fill="White" VerticalAlignment="Top" Width="5"/>
                 <Rectangle Stroke="White" Margin="0,9,124,0" StrokeThickness="4" Width="43" HorizontalAlignment="Right" VerticalAlignment="Top" Height="25"/>
-                <TextBlock x:Name="BatteryText" HorizontalAlignment="Left" Margin="1436,13,0,0" TextWrapping="Wrap" Text="100%" VerticalAlignment="Top" FontWeight="Bold" Foreground="White" Width="37" TextAlignment="Center" Height="16"/>
+                <TextBlock x:Name="BatteryText" Text="{Binding BatteryPercentage, StringFormat={}{0}%}" HorizontalAlignment="Left" Margin="1436,13,0,0" TextWrapping="Wrap" VerticalAlignment="Top" FontWeight="Bold" Foreground="White" Width="37" TextAlignment="Center" Height="16"/>
             </Grid>
-            <TextBlock x:Name="ProcessInfo_DEBUG" HorizontalAlignment="Left" Margin="355,124,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Height="286" Width="821" Foreground="White" RenderTransformOrigin="0.526,0.47"><Run Text="Debug info goes here"/><LineBreak/><Run/></TextBlock>
+            <TextBlock x:Name="ProcessInfo_DEBUG" Text="{Binding DebugInfo}" Visibility="{Binding DebugVisible, Converter={StaticResource BoolToVis}}" HorizontalAlignment="Left" Margin="355,124,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Height="286" Width="821" Foreground="White" RenderTransformOrigin="0.526,0.47"/>
             <Border x:Name="SessionPanel" Background="#FF242424" CornerRadius="10" 
-Width="375" Height="56" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,677,36,0" BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="18,8,18,4">
+                    Width="375" Height="56" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,677,36,0" BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="18,8,18,4">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -180,20 +196,19 @@ Width="375" Height="56" VerticalAlignment="Top" HorizontalAlignment="Right" Marg
                     <!-- Total Play Time (Column 0) -->
                     <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
                         <Path Fill="#FFD0D0D0" 
-Width="16" 
-Height="16"
-Data="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z" Margin="0,0,8,0"/>
-                        <TextBlock x:Name="PlayTime" TextWrapping="Wrap" Foreground="#FFFFFFFF" FontSize="20" FontWeight="Bold" Text="99999 Hours"/>
+                              Width="16" 
+                              Height="16"
+                              Data="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="PlayTime" Text="{Binding TotalPlaytimeText}" TextWrapping="Wrap" Foreground="#FFFFFFFF" FontSize="20" FontWeight="Bold"/>
                     </StackPanel>
 
                     <!-- Session Play Time (Column 2) -->
                     <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
                         <Path Fill="#FFD0D0D0" 
-Width="16" 
-Height="16"
-Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l.013-.012.354-.354.353.354a.5.5 0 1 0 .707-.707l-1.414-1.415a.5.5 0 1 0-.707.707l.354.354-.354.354-.012.012A6.97 6.97 0 0 0 9 2.071V1h.5a.5.5 0 0 0 0-1zm2 5.6V9a.5.5 0 0 1-.5.5H4.5a.5.5 0 0 1 0-1h3V5.6a.5.5 0 1 1 1 0" Margin="0,0,8,0"/>
-                        <TextBlock x:Name="SessionTime" TextWrapping="Wrap" Foreground="#FFFFFFFF" FontSize="20" FontWeight="Bold" Text="12:34:56">
-                        </TextBlock>
+                              Width="16" 
+                              Height="16"
+                              Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l.013-.012.354-.354.353.354a.5.5 0 1 0 .707-.707l-1.414-1.415a.5.5 0 1 0-.707.707l.354.354-.354.354-.012.012A6.97 6.97 0 0 0 9 2.071V1h.5a.5.5 0 0 0 0-1zm2 5.6V9a.5.5 0 0 1-.5.5H4.5a.5.5 0 0 1 0-1h3V5.6a.5.5 0 1 1 1 0" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="SessionTime" Text="{Binding SessionPlaytimeText}" TextWrapping="Wrap" Foreground="#FFFFFFFF" FontSize="20" FontWeight="Bold"/>
                     </StackPanel>
 
                     <!-- Caption Labels - Left Aligned -->
@@ -201,16 +216,21 @@ Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l
                     <TextBlock Grid.Column="2" Grid.Row="1" Text="THIS SESSION" FontSize="9" Foreground="#80808080" HorizontalAlignment="Left" Margin="24,2,0,0"/>
                 </Grid>
             </Border>
+
+            <!-- Achievement Panel with visibility binding -->
             <Border x:Name="AchFade1" Background="#FF121212" CornerRadius="9" Padding="20,16,20,16" 
-                Width="352" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="52,518,0,0" 
-                BorderBrush="#30808080" BorderThickness="1,1,1,1"
-                Height="{Binding ActualHeight, ElementName=AchievementPanel}"/>
+                    Width="352" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="52,518,0,0" 
+                    BorderBrush="#30808080" BorderThickness="1,1,1,1"
+                    Height="{Binding ActualHeight, ElementName=AchievementPanel}"
+                    Visibility="{Binding HasAchievements, Converter={StaticResource BoolToVis}}"/>
             <Border x:Name="AchFade2" Background="#FF1B1B1B" CornerRadius="9.5" Padding="20,16,20,16" 
-                Width="365" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="46,514,0,0" 
-                BorderBrush="#40808080" BorderThickness="1,1,1,1"
-                Height="{Binding ActualHeight, ElementName=AchievementPanel}"/>
+                    Width="365" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="46,514,0,0" 
+                    BorderBrush="#40808080" BorderThickness="1,1,1,1"
+                    Height="{Binding ActualHeight, ElementName=AchievementPanel}"
+                    Visibility="{Binding HasAchievements, Converter={StaticResource BoolToVis}}"/>
             <Border x:Name="AchievementPanel" Background="#FF242424" CornerRadius="10" Padding="20,16,20,16" 
-                Width="377" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="40,510,0,0" BorderBrush="#80808080" BorderThickness="1,1,1,1">
+                    Width="377" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="40,510,0,0" BorderBrush="#80808080" BorderThickness="1,1,1,1"
+                    Visibility="{Binding HasAchievements, Converter={StaticResource BoolToVis}}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -222,7 +242,7 @@ Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l
                         <Border.Clip>
                             <RectangleGeometry RadiusX="4" RadiusY="4" Rect="0,0,32,32"/>
                         </Border.Clip>
-                        <Image x:Name="LastAchievementIcon" Stretch="UniformToFill" Width="32" Height="32" Source="https://icons.veryicon.com/png/o/business/classic-icon/trophy-20.png"/>
+                        <Image x:Name="LastAchievementIcon" Stretch="UniformToFill" Width="32" Height="32" Source="{Binding LastAchievement.IconUrl}"/>
                     </Border>
 
                     <!-- Achievement Info -->
@@ -231,24 +251,29 @@ Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l
                             <Path Fill="#D0808080" Height="11" Width="12" Stretch="Uniform" Data="M0 0.75c0-0.414 0.336-0.75 0.75-0.75h2.885c0.019 0 0.037 0.001 0.056 0.002h6.621c0.018-0.001 0.036-0.002 0.054-0.002H13.25c0.414 0 0.75 0.336 0.75 0.75V3.635c0 1.859-1.396 3.392-3.197 3.609-0.447 1.369-1.614 2.413-3.053 2.686V12.5h2.615c0.414 0 0.75 0.336 0.75 0.75s-0.336 0.75-0.75 0.75H7.026c-0.009 0-0.017 0-0.026 0s-0.017 0-0.026 0H3.635c-0.414 0-0.75-0.336-0.75-0.75s0.336-0.75 0.75-0.75H6.25V9.93c-1.439-0.273-2.605-1.317-3.053-2.686C1.396 7.027 0 5.494 0 3.635V0.75ZM2.885 5.634V1.5H1.5v2.135c0 0.915 0.576 1.696 1.385 1.999ZM11.115 1.5v4.134c0.809-0.304 1.385-1.084 1.385-1.999V1.5h-1.385Z" Margin="0,0,5,-1"/>
                             <TextBlock x:Name="LastAchievementLabel" Text="RECENT ACHIEVEMENT" FontSize="11" Foreground="#80808080"/>
                             <TextBlock Text="&#8226;" FontSize="11" Foreground="#60808080" Margin="4,0,4,0"/>
-                            <TextBlock x:Name="LastAchievementDate" Text="2 DAYS AGO" FontSize="11" Foreground="#80808080"/>
+                            <TextBlock x:Name="LastAchievementDate" Text="{Binding LastAchievementTimeText}" FontSize="11" Foreground="#80808080"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="LastAchievementName" Text="No Achievements Unlocked" 
-                   Foreground="White" FontWeight="Bold" FontSize="16" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="LastAchievementName" Text="{Binding LastAchievement.Name}" 
+                                   Foreground="White" FontWeight="Bold" FontSize="16" TextTrimming="CharacterEllipsis"/>
 
-                        <TextBlock x:Name="LastAchievementDescription" Text="Unlock an achievement" 
-                   Foreground="#FFD0D0D0" FontSize="12" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" 
-                   MaxHeight="36"/>
+                        <TextBlock x:Name="LastAchievementDescription" Text="{Binding LastAchievement.Description}" 
+                                   Foreground="#FFD0D0D0" FontSize="12" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" 
+                                   MaxHeight="36"/>
                     </StackPanel>
                 </Grid>
-
             </Border>
-            <TextBlock x:Name="UnlockPercent" HorizontalAlignment="Left" Margin="60,485,0,0" TextWrapping="Wrap" Text="Unlocked 123/456 Achievements" VerticalAlignment="Top" Foreground="White" FontWeight="Bold"/>
-            <Border Background="#FF242424" CornerRadius="10" x:Name="ShortcutBar"
-        MinWidth="64" MinHeight="64" VerticalAlignment="Bottom" HorizontalAlignment="Left" 
-        BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="4,4,4,4" Margin="40,0,0,20">
-                <ItemsControl x:Name="ButtonItemsControl" ItemsSource="{Binding ShortcutButtons}">
+
+            <TextBlock x:Name="UnlockPercent" Text="{Binding UnlockPercentText}" 
+                       Visibility="{Binding HasAchievements, Converter={StaticResource BoolToVis}}" 
+                       HorizontalAlignment="Left" Margin="60,485,0,0" TextWrapping="Wrap" 
+                       VerticalAlignment="Top" Foreground="White" FontWeight="Bold"/>
+
+            <!-- Shortcut Buttons -->
+            <Border Focusable="False" Background="#FF242424" CornerRadius="10" x:Name="ShortcutBar"
+                    MinWidth="64" MinHeight="64" VerticalAlignment="Bottom" HorizontalAlignment="Left" 
+                    BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="4,4,4,4" Margin="40,0,0,20">
+                <ItemsControl Focusable="False" ItemsSource="{Binding ShortcutButtons}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
@@ -256,15 +281,69 @@ Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Button Width="70" Height="70" Margin="4" 
-                                Command="{Binding DataContext.ButtonCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                CommandParameter="{Binding}"
-                                ToolTip="{Binding Title}">
-                                <StackPanel>
-                                    <Image Source="{Binding IconPath}" Width="32" Height="32" Margin="0,0,0,4"/>
-                                    <TextBlock Text="{Binding Title}" TextAlignment="Center" 
-                                   TextWrapping="Wrap" FontSize="10"/>
-                                </StackPanel>
+                            <Button Width="60" Height="60" Margin="4" 
+                                    Command="{Binding DataContext.ShortcutButtonCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}"
+                                    >
+                                <Button.Resources>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
+                                </Button.Resources>
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="Opacity" Value="0.7" />
+                                        <Setter Property="BorderBrush" Value="Transparent" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="border"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="border" Property="Background" Value="#FF363636"/>
+                                                            <Setter Property="Opacity" Value="1"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsFocused" Value="True">
+                                                            <Setter TargetName="border" Property="Background" Value="#FF363636"/>
+                                                            <Setter Property="Opacity" Value="1"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Button.Style>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="{Binding Title}" TextAlignment="Center" 
+               TextWrapping="Wrap" FontSize="10" Foreground="White" Margin="-75,-40,-75,0" 
+               FontWeight="Bold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsFocused, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <Image Grid.Row="1" Source="{Binding IconPath}" Width="32" Height="32" Margin="0,4,0,4"/>
+                                </Grid>
                             </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 namespace PlayniteGameOverlay
 {
-    class ButtonActions
+    public static class ButtonActions
     {
         public static void FocusOrLaunchDiscord()
         {
