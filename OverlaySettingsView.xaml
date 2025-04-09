@@ -73,5 +73,101 @@
         <TextBlock Text="Shows additional debugging information in the overlay. Useful if a game is not able to be exited. Also causes the overlay to output a LOAD of logs to the debugger console." 
                    Margin="0,0,0,15"
                    Foreground="#888888"/>
+
+        <TextBlock Text="Buttons" FontSize="18" />
+        <TextBlock 
+           Margin="0,0,0,15"
+           Foreground="#888888">
+            Keyboard shortcuts are written in SendKeys format. Ctrl is written as '^', Shift as '+', and Alt as '%'. See more info <Hyperlink NavigateUri="https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.sendkeys.send?view=windowsdesktop-9.0">here</Hyperlink>
+        </TextBlock>
+
+            <!-- Recording gameplay toggle -->
+        <CheckBox IsChecked="{Binding ShowDiscord}" 
+          Content="Show Discord Button" 
+          Margin="0,10,0,5"/>
+        <Grid Margin="20,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Note: Discord launches really weirdly so path is not customizable" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Recording gameplay toggle -->
+        <CheckBox IsChecked="{Binding ShowRecordGameplay}" 
+          Content="Show Record Gameplay Button" 
+          Margin="0,10,0,5"/>
+        <Grid Margin="20,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Shortcut:" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Text="{Binding RecordGameplayShortcut}"/>
+        </Grid>
+
+        <!-- Record recent gameplay toggle -->
+        <CheckBox IsChecked="{Binding ShowRecordRecent}" 
+          Content="Show Record Recent Gameplay Button" 
+          Margin="0,10,0,5"/>
+        <Grid Margin="20,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Shortcut:" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Text="{Binding RecordRecentShortcut}"/>
+        </Grid>
+
+        <!-- Streaming toggle -->
+        <CheckBox IsChecked="{Binding ShowStreaming}" 
+          Content="Show Streaming Button" 
+          Margin="0,10,0,5"/>
+        <Grid Margin="20,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Shortcut:" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Text="{Binding StreamingShortcut}"/>
+        </Grid>
+
+        <!-- Performance overlay toggle -->
+        <CheckBox IsChecked="{Binding ShowPerformanceOverlay}" 
+          Content="Show Performance Overlay Button" 
+          Margin="0,10,0,5"/>
+        <Grid Margin="20,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Shortcut:" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Text="{Binding PerformanceOverlayShortcut}"/>
+        </Grid>
+
+        <!-- Screenshot gallery toggle -->
+        <CheckBox IsChecked="{Binding ShowScreenshotGallery}" 
+          Content="Show Screenshot Gallery Button" 
+          Margin="0,10,0,5"/>
+        <Grid Margin="20,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Directory:" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Text="{Binding ScreenshotGalleryPath}"/>
+        </Grid>
+
+        <!-- Web browser toggle -->
+        <CheckBox IsChecked="{Binding ShowWebBrowser}" 
+          Content="Show Web Browser Button" 
+          Margin="0,10,0,5"/>
+        <Grid Margin="20,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Browser Path:" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Text="{Binding WebBrowserPath}"/>
+        </Grid>
     </StackPanel>
 </UserControl>

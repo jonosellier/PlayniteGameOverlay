@@ -245,6 +245,31 @@ Data="M6.5 0a.5.5 0 0 0 0 1H7v1.07A7.001 7.001 0 0 0 8 16a7 7 0 0 0 5.29-11.584l
 
             </Border>
             <TextBlock x:Name="UnlockPercent" HorizontalAlignment="Left" Margin="60,485,0,0" TextWrapping="Wrap" Text="Unlocked 123/456 Achievements" VerticalAlignment="Top" Foreground="White" FontWeight="Bold"/>
+            <Border Background="#FF242424" CornerRadius="10" x:Name="ShortcutBar"
+        MinWidth="64" MinHeight="64" VerticalAlignment="Bottom" HorizontalAlignment="Left" 
+        BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="4,4,4,4" Margin="40,0,0,20">
+                <ItemsControl x:Name="ButtonItemsControl" ItemsSource="{Binding ShortcutButtons}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Width="70" Height="70" Margin="4" 
+                                Command="{Binding DataContext.ButtonCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                ToolTip="{Binding Title}">
+                                <StackPanel>
+                                    <Image Source="{Binding IconPath}" Width="32" Height="32" Margin="0,0,0,4"/>
+                                    <TextBlock Text="{Binding Title}" TextAlignment="Center" 
+                                   TextWrapping="Wrap" FontSize="10"/>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
         </Grid>
     </Viewbox>
 </Window>

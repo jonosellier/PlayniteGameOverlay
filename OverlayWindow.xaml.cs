@@ -9,7 +9,13 @@ using System.Linq;
 using SDL2;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media.Media3D;
+using System.Collections.ObjectModel;
+using System.Windows.Controls;
+using Orientation = System.Windows.Controls.Orientation;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using System.Windows.Media;
+using System.Threading;
+using System.Collections.Generic;
 
 namespace PlayniteGameOverlay
 {
@@ -24,6 +30,8 @@ namespace PlayniteGameOverlay
                 Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
             }
         }
+
+        public ICommand ButtonCommand { get; set; }
 
         private readonly DispatcherTimer clockTimer;
         private DispatcherTimer batteryUpdateTimer;
@@ -73,8 +81,288 @@ namespace PlayniteGameOverlay
 
             // Set initial focus to first button
             ReturnToGameButton.Focus();
-
             SetAspectRatio();
+            CreateButtons(settings);
+        }
+
+        public ObservableCollection<ButtonItem> ShortcutButtons;
+
+        private void CreateButtons(OverlaySettings settings)
+        {
+
+            List<ButtonItem> buttonItems = new List<ButtonItem>();
+
+            // Add Discord button if enabled
+            if (settings.ShowDiscord)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Discord",
+                    Path = "",
+                    IconPath = "/PlayniteGameOverlay;component/assets/discord.png",
+                    ClickAction = () => ButtonActions.FocusOrLaunchDiscord()
+                });
+            }
+
+            // Add Web Browser button if enabled
+            if (settings.ShowWebBrowser && !string.IsNullOrEmpty(settings.WebBrowserPath))
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Browser",
+                    Path = settings.WebBrowserPath,
+                    IconPath = "/PlayniteGameOverlay;component/assets/browser.png",
+                    ClickAction = () => ButtonActions.FocusOrLaunch(settings.WebBrowserPath)
+                });
+            }
+
+            // Add Record Gameplay button if enabled
+            if (settings.ShowRecordGameplay)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Toggle Recording",
+                    Path = settings.RecordGameplayShortcut,
+                    IconPath = "/PlayniteGameOverlay;component/assets/record.png",
+                    ClickAction = () => ButtonActions.ExecuteKbdShortcut(settings.RecordGameplayShortcut)
+                });
+            }
+
+            // Add Record Recent Gameplay button if enabled
+            if (settings.ShowRecordRecent)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Record Recent",
+                    Path = settings.RecordRecentShortcut,
+                    IconPath = "/PlayniteGameOverlay;component/assets/record-recent.png",
+                    ClickAction = () => ButtonActions.ExecuteKbdShortcut(settings.RecordRecentShortcut)
+                });
+            }
+
+            // Add Streaming button if enabled
+            if (settings.ShowStreaming)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Toggle Streaming",
+                    Path = settings.StreamingShortcut,
+                    IconPath = "/PlayniteGameOverlay;component/assets/stream.png",
+                    ClickAction = () => ButtonActions.ExecuteKbdShortcut(settings.StreamingShortcut)
+                });
+            }
+
+            // Add Performance Overlay button if enabled
+            if (settings.ShowPerformanceOverlay)
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "Toggle Performance Overlay",
+                    Path = settings.PerformanceOverlayShortcut,
+                    IconPath = "/PlayniteGameOverlay;component/assets/performance.png",
+                    ClickAction = () => ButtonActions.ExecuteKbdShortcut(settings.PerformanceOverlayShortcut)
+                });
+            }
+
+            // Add Screenshot Gallery button if enabled
+            if (settings.ShowScreenshotGallery && !string.IsNullOrEmpty(settings.ScreenshotGalleryPath))
+            {
+                buttonItems.Add(new ButtonItem
+                {
+                    Title = "View Screenshots",
+                    Path = settings.ScreenshotGalleryPath,
+                    IconPath = "/PlayniteGameOverlay;component/assets/screenshot.png",
+                    ClickAction = () => ButtonActions.FocusOrLaunch(settings.ScreenshotGalleryPath)
+                });
+            }
+
+            ShortcutButtons = new ObservableCollection<ButtonItem>(buttonItems);
+
+            var hoverBrush = (SolidColorBrush)new BrushConverter().ConvertFrom("#FF363636");
+            var bgBrush = new SolidColorBrush(Colors.Transparent);
+
+            // Create a WrapPanel to hold the buttons inside the border
+            WrapPanel buttonPanel = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            ShortcutBar.Child = buttonPanel;
+
+            foreach (var (buttonItem, idx) in ShortcutButtons.Select((value, i) => (value, i)))
+            {
+
+                // Create a Grid for layering the label over the button
+                Grid buttonGrid = new Grid
+                {
+                    Width = 60,
+                    Height = 54,
+                    Margin = idx == 0 ? new Thickness(2, -4, 2, 2) : new Thickness(8, -4, 2, 2)
+                };
+
+                // Create the button with image
+                System.Windows.Controls.Button btn = new System.Windows.Controls.Button
+                {
+                    Width = 48,
+                    Height = 48,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    ToolTip = buttonItem.Title,
+                    Padding = new Thickness(0),
+                    Background = bgBrush,
+                    Margin = new Thickness(0, 0, 0, 0),
+                    Opacity = 0.7
+                };
+
+                // Add image to button
+                Image img = new Image
+                {
+                    Source = new BitmapImage(new Uri(buttonItem.IconPath, UriKind.RelativeOrAbsolute)),
+                    Width = 40,
+                    Height = 40,
+                    Margin = new Thickness(4)
+                };
+                btn.Content = img;
+
+                // Create a border with rounded corners for text background
+                Border textBorder = new Border
+                {
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(4, 2, 4, 2),
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(-100, -20, -100, 10),
+                    Visibility = Visibility.Collapsed, // Hidden by default
+                };
+
+                // Create text label with white color
+                TextBlock txt = new TextBlock
+                {
+                    Text = buttonItem.Title.ToUpper(),
+                    FontWeight = FontWeights.Bold,
+                    TextAlignment = TextAlignment.Center,
+                    TextWrapping = TextWrapping.NoWrap, // Allow multi-line wrapping
+                    FontSize = 10,
+                    Foreground = (SolidColorBrush)new BrushConverter().ConvertFrom("#FFD0D0D0"),
+                    TextTrimming = TextTrimming.CharacterEllipsis // Optional: Prevent overflow issues
+
+                };
+
+                textBorder.MinWidth = txt.MinWidth;
+                textBorder.MaxWidth = txt.MaxWidth;
+                textBorder.Child = txt;
+
+
+                // Add hover/focus events to show/hide label
+                btn.MouseEnter += (sender, e) => {
+                    textBorder.Visibility = Visibility.Visible;
+                    btn.Background = hoverBrush;
+                    btn.Opacity = 1;
+
+                };
+                btn.MouseLeave += (sender, e) => {
+                    textBorder.Visibility = Visibility.Collapsed;
+                    btn.Background = bgBrush;
+                    btn.Opacity = 0.7;
+
+                };
+                btn.GotFocus += (sender, e) => {
+                    textBorder.Visibility = Visibility.Visible;
+                    btn.Background = hoverBrush;
+                    btn.Opacity = 1;
+                };
+                btn.LostFocus += (sender, e) => { 
+                    textBorder.Visibility = Visibility.Collapsed;
+                    btn.Background = bgBrush;
+                    btn.Opacity = 0.7;
+                };
+
+                // Add click handler
+                btn.Click += (sender, e) =>
+                {
+                    ReturnToGameButton_Click(sender, e);
+                    buttonItem.ClickAction?.Invoke();
+                };
+
+                // Add elements to grid
+                buttonGrid.Children.Add(btn);     // Button at the bottom
+                buttonGrid.Children.Add(textBorder); // Text floats above
+
+                // Add the grid to panel
+                buttonPanel.Children.Add(buttonGrid);
+            }
+        }
+
+        private bool IsFolderOpen(string folderPath)
+        {
+            try
+            {
+                // Normalize path for comparison (ensure it ends with backslash)
+                folderPath = System.IO.Path.GetFullPath(folderPath);
+                if (!folderPath.EndsWith("\\"))
+                    folderPath += "\\";
+
+                // Get Shell application object
+                Type shellAppType = Type.GetTypeFromProgID("Shell.Application");
+                dynamic shellApp = Activator.CreateInstance(shellAppType);
+
+                // Get all open Explorer windows
+                var windows = shellApp.Windows();
+
+                for (int i = 0; i < windows.Count; i++)
+                {
+                    try
+                    {
+                        var window = windows.Item(i);
+
+                        // Skip non-Explorer windows
+                        if (window.Name != "Windows Explorer" && window.Name != "File Explorer")
+                            continue;
+
+                        // Get the location of this window
+                        string location = null;
+                        try
+                        {
+                            var document = window.Document;
+                            location = document.Folder.Self.Path;
+
+                            // Normalize for comparison
+                            location = System.IO.Path.GetFullPath(location);
+                            if (!location.EndsWith("\\"))
+                                location += "\\";
+                        }
+                        catch
+                        {
+                            continue; // Skip if we can't get the location
+                        }
+
+                        // If this window shows our folder, activate it
+                        if (string.Equals(location, folderPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Activate the window
+                            window.Visible = true;
+                            window.Activate();
+
+                            // Maximize the window if needed
+                            IntPtr hwnd = new IntPtr(window.HWND);
+                            ShowWindow(hwnd, SW_MAXIMIZE);
+
+                            return true;
+                        }
+                    }
+                    catch
+                    {
+                        // Skip this window if there's an error
+                        continue;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking for open folder: {ex.Message}");
+            }
+
+            return false;
         }
 
         private void SetAspectRatio()
@@ -761,7 +1049,9 @@ namespace PlayniteGameOverlay
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
+
         private const int SW_RESTORE = 9;
+        private const int SW_MAXIMIZE = 3;
 
         // Event to request showing Playnite (to be handled by the plugin)
         public event Action OnShowPlayniteRequested;
