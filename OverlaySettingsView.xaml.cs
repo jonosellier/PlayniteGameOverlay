@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Navigation;
 
 namespace PlayniteGameOverlay
 {
@@ -33,6 +35,13 @@ namespace PlayniteGameOverlay
                 _controllerShortcut = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ControllerShortcut)));
             }
+        }
+
+
+        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+            e.Handled = true;
         }
     }
 

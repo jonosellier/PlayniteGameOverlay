@@ -5,7 +5,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Linq;
 using System.Diagnostics;
-using System.Windows.Forms;
 
 namespace PlayniteGameOverlay
 {

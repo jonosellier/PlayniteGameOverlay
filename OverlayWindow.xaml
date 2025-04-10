@@ -272,7 +272,7 @@
             <!-- Shortcut Buttons -->
             <Border Focusable="False" Background="#FF242424" CornerRadius="10" x:Name="ShortcutBar"
                     MinWidth="64" MinHeight="64" VerticalAlignment="Bottom" HorizontalAlignment="Left" 
-                    BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="4,4,4,4" Margin="40,0,0,20">
+                    BorderBrush="#80808080" BorderThickness="1,1,1,1" Padding="4,4,4,4" Margin="40,0,0,20" Visibility="{Binding ShowShortcutButtons, Converter={StaticResource BoolToVis}}">
                 <ItemsControl Focusable="False" ItemsSource="{Binding ShortcutButtons}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>

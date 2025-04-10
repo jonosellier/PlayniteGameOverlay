@@ -32,6 +32,8 @@ namespace PlayniteGameOverlay
         private ObservableCollection<ShortcutButtonViewModel> _shortcutButtons;
         private bool _hasBattery;
 
+        public bool ShowShortcutButtons => ShortcutButtons.Count > 0;
+
         public string GameTitle
         {
             get => _gameTitle;
@@ -133,6 +135,24 @@ namespace PlayniteGameOverlay
         {
             get => _lastAchievement;
             set { _lastAchievement = value; OnPropertyChanged(); }
+        }
+
+        public string LastAchievementTimeText { 
+            get {
+                if (LastAchievement == null)
+                {
+                    return string.Empty;
+                }
+                if (LastAchievement.UnlockDate.HasValue)
+                {
+                    var span = DateTime.Now - LastAchievement.UnlockDate.Value;
+                    return span.TotalHours > 24 ? $"{(int)span.TotalDays} days ago" : $"{(int)span.TotalHours} hours ago";
+                }
+                else
+                {
+                    return "recently";
+                }
+            }
         }
 
         public string UnlockPercentText

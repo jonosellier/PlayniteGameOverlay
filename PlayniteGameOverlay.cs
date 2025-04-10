@@ -91,6 +91,7 @@ namespace PlayniteGameOverlay
 
         public void ReloadOverlay(OverlaySettings settings)
         {
+            ControllerManager.Initialize(settings.DebugMode);
             overlayWindow.Close(); //close old window
             overlayWindow = new OverlayWindow(settings != null ? settings : Settings); //open new one
             overlayWindow.Hide();
