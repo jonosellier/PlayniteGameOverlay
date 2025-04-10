@@ -14,7 +14,6 @@ using Playnite.SDK.Plugins;
 using SDL2;
 using System.Windows.Threading;
 using System.ComponentModel;
-using IWshRuntimeLibrary;
 
 namespace PlayniteGameOverlay
 {
@@ -32,8 +31,6 @@ namespace PlayniteGameOverlay
 
         public override Guid Id { get; } = Guid.Parse("fc75626e-ec69-4287-972a-b86298555ebb");
 
-        private Logger _logger;
-
         DateTime gameStarted;
 
         // SuccessStory integration
@@ -49,16 +46,16 @@ namespace PlayniteGameOverlay
 
                 if (isSuccessStoryAvailable)
                 {
-                    _logger.Log("SuccessStory plugin detected, achievement integration enabled");
+                    log("SuccessStory plugin detected, achievement integration enabled");
                 }
                 else
                 {
-                    _logger.Log("SuccessStory plugin not found, achievement integration disabled");
+                    log("SuccessStory plugin not found, achievement integration disabled");
                 }
             }
             catch (Exception ex)
             {
-                _logger.Log($"Error checking for SuccessStory plugin: {ex.Message}", "ERROR");
+                log($"Error checking for SuccessStory plugin: {ex.Message}", "ERROR");
                 isSuccessStoryAvailable = false;
             }
         }
@@ -75,8 +72,6 @@ namespace PlayniteGameOverlay
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             logger.Info("Starting Overlay Extension...");
-
-            _logger = new Logger(settings?.DebugMode ?? false);
 
             // Check if SuccessStory is installed
             CheckSuccessStoryAvailability();
@@ -99,7 +94,7 @@ namespace PlayniteGameOverlay
             overlayWindow.Close(); //close old window
             overlayWindow = new OverlayWindow(settings != null ? settings : Settings); //open new one
             overlayWindow.Hide();
-            if(GameOverlayData != null)
+            if (GameOverlayData != null)
             {
                 overlayWindow.UpdateGameOverlay(GameOverlayData);
             }
@@ -123,8 +118,7 @@ namespace PlayniteGameOverlay
             if (altPressed && key == Keys.Oem3)
             {
                 var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
-                //ShowGameOverlay(runningGame);
-                //return;
+
                 if (runningGame != null)
                 {
                     if (overlayWindow.IsVisible)
@@ -194,7 +188,7 @@ namespace PlayniteGameOverlay
 
         private List<AchievementData> GetGameAchievements(Game game)
         {
-            _logger.Log($"Retrieving achievements for game {game.Name} (ID: {game.Id}, SuccessStory Enabled: {isSuccessStoryAvailable})");
+            log($"Retrieving achievements for game {game.Name} (ID: {game.Id}, SuccessStory Enabled: {isSuccessStoryAvailable})");
             var achievements = new List<AchievementData>();
 
             if (!isSuccessStoryAvailable || game == null)
@@ -283,7 +277,7 @@ namespace PlayniteGameOverlay
                     }
                     gameExecutables.AddRange(additionalNames);
 
-                    _logger.Log($"Found {gameExecutables.Count} potential game executables in {game.InstallDirectory}");
+                    log($"Found {gameExecutables.Count} potential game executables in {game.InstallDirectory}");
                 }
                 catch (Exception ex)
                 {
@@ -295,7 +289,7 @@ namespace PlayniteGameOverlay
                 string[] gameNameWords = gameName.ToLower().Split(new char[] { ' ', '-', '_', ':', '.', '(', ')', '[', ']' },
                     StringSplitOptions.RemoveEmptyEntries);
 
-                _logger.Log($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
+                log($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
 
                 // Get all processes with main window
                 Process[] allProcesses = Process.GetProcesses()
@@ -389,7 +383,7 @@ namespace PlayniteGameOverlay
                 if (candidates.Count > 0)
                 {
                     var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
-                    _logger.Log($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    log($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
                     return bestMatch;
                 }
 
@@ -399,30 +393,39 @@ namespace PlayniteGameOverlay
                     var bestMatch = titleMatchCandidates.OrderByDescending(t => t.MatchCount)
                                                         .ThenByDescending(t => t.Process.WorkingSet64)
                                                         .First().Process;
-                    _logger.Log($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
+                    log($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
                     return bestMatch;
                 }
 
                 if (nameMatchCandidates.Count > 0)
                 {
                     var bestMatch = nameMatchCandidates.OrderByDescending(p => p.WorkingSet64).First();
-                    _logger.Log($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                    log($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
                     return bestMatch;
                 }
 
                 if (inaccessibleCandidates.Count > 0)
                 {
                     var bestGuess = inaccessibleCandidates.OrderByDescending(p => p.WorkingSet64).First();
-                    _logger.Log($"Using best guess process: {bestGuess.ProcessName} (ID: {bestGuess.Id})");
+                    log($"Using best guess process: {bestGuess.ProcessName} (ID: {bestGuess.Id})");
                     return bestGuess;
                 }
             }
             catch (Exception ex)
             {
-                _logger.Log($"Error finding game process: {ex.Message}", "ERROR");
+                log($"Error finding game process: {ex.Message}", "ERROR");
             }
 
             return null;
+        }
+
+        private void log(string msg, string tag = "DEBUG")
+        {
+            if (true)
+            {
+                Debug.WriteLine("GameOverlay[" + tag + "]: " + msg);
+            }
+            logger.Debug(msg);
         }
 
         private void ShowPlaynite()
@@ -441,7 +444,7 @@ namespace PlayniteGameOverlay
                 }
                 // Try desktop first
                 Process[] processes = Process.GetProcessesByName("Playnite.DesktopApp");
-                if(processes.Length > 0)
+                if (processes.Length > 0)
                 {
                     Process.Start(Path.Combine(playniteAPI.Paths.ApplicationPath, "Playnite.DesktopApp.exe"));
                     return;
@@ -455,7 +458,7 @@ namespace PlayniteGameOverlay
                 }
                 else
                 {
-                    _logger.Log("Could not find any Playnite process to activate", "WARNING");
+                    log("Could not find any Playnite process to activate", "WARNING");
                 }
             }
             catch (Exception ex)
@@ -471,7 +474,7 @@ namespace PlayniteGameOverlay
 
             try
             {
-                
+
                 var successStoryData = JsonSerializer.Deserialize<SuccessStoryData>(jsonData);
 
                 if (successStoryData?.Items == null)
@@ -504,17 +507,17 @@ namespace PlayniteGameOverlay
                     });
                 }
 
-                _logger.Log($"Successfully parsed {achievements.Count} achievements from SuccessStory");
+                log($"Successfully parsed {achievements.Count} achievements from SuccessStory");
             }
             catch (Exception ex)
             {
-                _logger.Log($"Error parsing SuccessStory file: {ex.Message}", "ERROR");
+                log($"Error parsing SuccessStory file: {ex.Message}", "ERROR");
             }
 
             return achievements;
         }
 
-        #region SDL2
+        #region Controller
         private void InitializeController()
         {
             // Initialize singleton with your logger
@@ -527,69 +530,111 @@ namespace PlayniteGameOverlay
 
         private void OnControllerAction(object sender, ControllerEventArgs e)
         {
-            // We only want to process pressed events, not repeated or released
-            if (e.EventType != ControllerEventType.Pressed)
-                return;
-
-            // For Start+Back combination or Guide button handling
-            if (e.ButtonName == "Start" || e.ButtonName == "Back" || e.ButtonName == "Guide")
-            {
-                // Keep track of button states
-                if (e.ButtonName == "Start")
-                    _startPressed = true;
-                else if (e.ButtonName == "Back")
-                    _backPressed = true;
-                else if (e.ButtonName == "Guide")
-                    _guidePressed = true;
-
-                // Check for Start+Back combination
-                bool startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
-                                     _startPressed && _backPressed;
-
-                // Check for Guide press
-                bool guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
-                                     _guidePressed;
-
-                // Process the shortcut if either condition is met
-                if (startBackCombo || guideActivated)
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
-                    // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
-                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
-                        var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
-                        if (runningGame != null)
-                        {
-                            if (overlayWindow.IsVisible)
-                                overlayWindow.Hide();
-                            else
-                                ShowGameOverlay(runningGame);
-                        }
-                        else
-                        {
-                            ShowPlaynite(true);
-                        }
-                    }));
-                }
-            }
+                    if (overlayWindow != null && overlayWindow.IsActive)
+                    {
+                        // Log all controller actions
+                        log($"Window Recieved {e.EventType}: {e.ButtonName}", "SDL_INPUT");
 
-            // Reset button state on release
-            if (e.EventType == ControllerEventType.Released)
-            {
-                if (e.ButtonName == "Start")
-                    _startPressed = false;
-                else if (e.ButtonName == "Back")
-                    _backPressed = false;
-                else if (e.ButtonName == "Guide")
-                    _guidePressed = false;
-            }
+                        // Only process button presses and repeats (ignore releases)
+                        if (e.EventType == ControllerEventType.Released)
+                            return;
+
+                        switch (e.ButtonName)
+                        {
+                            case "Up":
+                                log("Navigating UP", "SDL_NAV");
+                                overlayWindow.FocusUp();
+                                break;
+                            case "Down":
+                                log("Navigating DOWN", "SDL_NAV");
+                                overlayWindow.FocusDown();
+                                break;
+                            case "Left":
+                                log("Navigating LEFT", "SDL_NAV");
+                                overlayWindow.FocusLeft();
+                                break;
+                            case "Right":
+                                log("Navigating RIGHT", "SDL_NAV");
+                                overlayWindow.FocusRight();
+                                break;
+                            case "A":
+                                log("Button A pressed - clicking focused element", "SDL_NAV");
+                                overlayWindow.ClickFocusedElement();
+                                break;
+                            case "B":
+                                log("Button B pressed - Hiding overlay", "SDL_NAV");
+                                overlayWindow.Hide();
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        // We only want to process pressed events, not repeated or released
+                        if (e.EventType == ControllerEventType.Repeated)
+                            return;
+
+                        // For Start+Back combination or Guide button handling
+                        if (e.ButtonName == "Start" || e.ButtonName == "Back" || e.ButtonName == "Guide")
+                        {
+                            // Keep track of button states
+                            if (e.ButtonName == "Start")
+                                _startPressed = true;
+                            else if (e.ButtonName == "Back")
+                                _backPressed = true;
+                            else if (e.ButtonName == "Guide")
+                                _guidePressed = true;
+
+                            // Check for Start+Back combination
+                            bool startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
+                                                 _startPressed && _backPressed;
+
+                            // Check for Guide press
+                            bool guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
+                                                 _guidePressed;
+
+                            // Process the shortcut if either condition is met
+                            if (startBackCombo || guideActivated)
+                            {
+                                // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
+                                System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+                                    if (runningGame != null)
+                                    {
+                                        if (overlayWindow.IsVisible)
+                                            overlayWindow.Hide();
+                                        else
+                                            ShowGameOverlay(runningGame);
+                                    }
+                                    else
+                                    {
+                                        ShowPlaynite(true);
+                                    }
+                                }));
+                            }
+                        }
+
+                        // Reset button state on release
+                        if (e.EventType == ControllerEventType.Released)
+                        {
+                            if (e.ButtonName == "Start")
+                                _startPressed = false;
+                            else if (e.ButtonName == "Back")
+                                _backPressed = false;
+                            else if (e.ButtonName == "Guide")
+                                _guidePressed = false;
+                        }
+                    }
+                });
         }
 
         // Class-level fields to track button states
         private bool _startPressed = false;
         private bool _backPressed = false;
         private bool _guidePressed = false;
-
         #endregion
-
 
         #region Settings
         public override ISettings GetSettings(bool firstRunSettings)
@@ -853,22 +898,22 @@ namespace PlayniteGameOverlay
                     AspectRatio = savedSettings.AspectRatio;
 
                 // Load toggle settings
-                if(savedSettings.ShowRecordGameplay != null) ShowRecordGameplay = savedSettings.ShowRecordGameplay;
-                if(savedSettings.ShowRecordRecent != null) ShowRecordRecent = savedSettings.ShowRecordRecent;
-                if(savedSettings.ShowStreaming != null) ShowStreaming = savedSettings.ShowStreaming;
-                if(savedSettings.ShowPerformanceOverlay != null) ShowPerformanceOverlay = savedSettings.ShowPerformanceOverlay;
-                if(savedSettings.ShowScreenshotGallery != null) ShowScreenshotGallery = savedSettings.ShowScreenshotGallery;
-                if(savedSettings.ShowWebBrowser != null) ShowWebBrowser = savedSettings.ShowWebBrowser;
-                if(savedSettings.ShowDiscord != null) ShowDiscord = savedSettings.ShowDiscord;
-                if(savedSettings.ShowBattery != null) ShowBattery = savedSettings.ShowBattery;
+                if (savedSettings.ShowRecordGameplay != null) ShowRecordGameplay = savedSettings.ShowRecordGameplay;
+                if (savedSettings.ShowRecordRecent != null) ShowRecordRecent = savedSettings.ShowRecordRecent;
+                if (savedSettings.ShowStreaming != null) ShowStreaming = savedSettings.ShowStreaming;
+                if (savedSettings.ShowPerformanceOverlay != null) ShowPerformanceOverlay = savedSettings.ShowPerformanceOverlay;
+                if (savedSettings.ShowScreenshotGallery != null) ShowScreenshotGallery = savedSettings.ShowScreenshotGallery;
+                if (savedSettings.ShowWebBrowser != null) ShowWebBrowser = savedSettings.ShowWebBrowser;
+                if (savedSettings.ShowDiscord != null) ShowDiscord = savedSettings.ShowDiscord;
+                if (savedSettings.ShowBattery != null) ShowBattery = savedSettings.ShowBattery;
 
                 // Load shortcut and path settings
                 if (savedSettings.RecordGameplayShortcut != null) RecordGameplayShortcut = savedSettings.RecordGameplayShortcut;
-                if(savedSettings.RecordRecentShortcut != null) RecordRecentShortcut = savedSettings.RecordRecentShortcut;
-                if(savedSettings.StreamingShortcut != null) StreamingShortcut = savedSettings.StreamingShortcut;
-                if(savedSettings.PerformanceOverlayShortcut != null) PerformanceOverlayShortcut = savedSettings.PerformanceOverlayShortcut;
-                if(savedSettings.ScreenshotGalleryPath != null) ScreenshotGalleryPath = savedSettings.ScreenshotGalleryPath;
-                if(savedSettings.WebBrowserPath != null) WebBrowserPath = savedSettings.WebBrowserPath;
+                if (savedSettings.RecordRecentShortcut != null) RecordRecentShortcut = savedSettings.RecordRecentShortcut;
+                if (savedSettings.StreamingShortcut != null) StreamingShortcut = savedSettings.StreamingShortcut;
+                if (savedSettings.PerformanceOverlayShortcut != null) PerformanceOverlayShortcut = savedSettings.PerformanceOverlayShortcut;
+                if (savedSettings.ScreenshotGalleryPath != null) ScreenshotGalleryPath = savedSettings.ScreenshotGalleryPath;
+                if (savedSettings.WebBrowserPath != null) WebBrowserPath = savedSettings.WebBrowserPath;
             }
         }
 

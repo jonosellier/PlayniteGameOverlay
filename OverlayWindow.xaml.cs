@@ -4,6 +4,8 @@ using System.Windows.Threading;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Linq;
+using System.Diagnostics;
+using System.Windows.Forms;
 
 namespace PlayniteGameOverlay
 {
@@ -22,11 +24,17 @@ namespace PlayniteGameOverlay
         private DateTime lastLeftTime = DateTime.MinValue;
         private DateTime lastRightTime = DateTime.MinValue;
 
+        OverlaySettings Settings;
+
+        public bool Active = false;
+
         public OverlayWindowViewModel ViewModel { get; private set; }
 
         public OverlayWindow(OverlaySettings settings)
         {
             InitializeComponent();
+
+            Settings = settings;
 
             _logger = new Logger(settings?.DebugMode ?? false);
             _gameStateManager = new GameStateManager(_logger);
@@ -37,9 +45,31 @@ namespace PlayniteGameOverlay
             this.DataContext = ViewModel;
 
             // Connect ViewModel events to handlers
-            ViewModel.HideOverlayRequested += () => this.Hide();
-            ViewModel.ShowPlayniteRequested += (fullscreen) => OnShowPlayniteRequested?.Invoke();
-            ViewModel.CloseGameRequested += () => CloseGame();
+            ViewModel.HideOverlayRequested += () => {
+                if (ViewModel.IsGameRunning)
+                {
+                    var proc = FindProcessById(ViewModel.ProcessId);
+                    if (proc != null)
+                    {
+                        // Restore the window if it's minimized
+                        if (WindowHelper.IsIconic(proc.MainWindowHandle))
+                        {
+                            WindowHelper.ShowWindow(proc.MainWindowHandle, WindowHelper.SW_RESTORE);
+                        }
+                        // Bring the game window to the front
+                        WindowHelper.SetForegroundWindow(proc.MainWindowHandle);
+                    }
+                }
+                this.Hide(); 
+            };
+            ViewModel.ShowPlayniteRequested += (fullscreen) => {
+                this.Hide();
+                OnShowPlayniteRequested?.Invoke(); 
+            };
+            ViewModel.CloseGameRequested += () => {
+                this.Hide();
+                CloseGame(); 
+            };
             ViewModel.ExecuteShortcutRequested += ExecuteShortcut;
 
             // Set the window to fullscreen
@@ -52,7 +82,6 @@ namespace PlayniteGameOverlay
             clockTimer.Start();
 
             InitializeBatteryDisplay();
-            InitializeController(settings?.DebugMode ?? false);
 
             // Disable keyboard navigation
             this.PreviewKeyDown += OverlayWindow_PreviewKeyDown;
@@ -60,57 +89,6 @@ namespace PlayniteGameOverlay
             // Initialize buttons and setup from settings
             ViewModel.DebugVisible = settings?.DebugMode ?? false;
             ViewModel.InitializeShortcutButtons(settings);
-        }
-
-        private void InitializeController(bool debugMode)
-        {
-            // Initialize singleton with your logger
-            ControllerManager.Initialize(debugMode);
-
-            // Subscribe to controller events
-            ControllerManager.Instance.ControllerAction += OnControllerAction;
-        }
-
-        private void OnControllerAction(object sender, ControllerEventArgs e)
-        {
-            // Log all controller actions
-            _logger.Log($"Controller {e.EventType}: {e.ButtonName}", "SDL_INPUT");
-
-            // Only process button presses and repeats (ignore releases)
-            if (e.EventType == ControllerEventType.Released)
-                return;
-
-            // Process the navigation or action on the UI thread
-            Dispatcher.Invoke(() =>
-            {
-                switch (e.ButtonName)
-                {
-                    case "Up":
-                        _logger.Log("Navigating UP", "SDL_NAV");
-                        FocusPreviousElement();
-                        break;
-                    case "Down":
-                        _logger.Log("Navigating DOWN", "SDL_NAV");
-                        FocusNextElement();
-                        break;
-                    case "Left":
-                        _logger.Log("Navigating LEFT", "SDL_NAV");
-                        FocusLeftElement();
-                        break;
-                    case "Right":
-                        _logger.Log("Navigating RIGHT", "SDL_NAV");
-                        FocusRightElement();
-                        break;
-                    case "A":
-                        _logger.Log("Button A pressed - clicking focused element", "SDL_NAV");
-                        ClickFocusedElement();
-                        break;
-                    case "B":
-                        _logger.Log("Button B pressed - Hiding overlay", "SDL_NAV");
-                        this.Hide();
-                        break;
-                }
-            });
         }
 
         private void InitializeBatteryDisplay()
@@ -215,6 +193,7 @@ namespace PlayniteGameOverlay
 
         public void ShowOverlay()
         {
+            Active = true;
             // Resume timers and immediately update
             ResumeTimers();
 
@@ -223,15 +202,16 @@ namespace PlayniteGameOverlay
             UpdateBattery(null, EventArgs.Empty);
 
             // Show the window
-            this.Show();
+            Dispatcher.Invoke(() =>
+            {
+                this.Show();
+                // Activate the window to bring it to the foreground and set focus
+                this.Activate();
+                ForceFocusOverlay();
+                // Set focus to first button when showing overlay
+                ReturnToGameButton.Focus();
+            });
 
-            // Activate the window to bring it to the foreground and set focus
-            this.Activate();
-
-            ForceFocusOverlay();
-
-            // Set focus to first button when showing overlay
-            ReturnToGameButton.Focus();
         }
 
         public void ForceFocusOverlay()
@@ -276,6 +256,18 @@ namespace PlayniteGameOverlay
             });
         }
 
+        private Process FindProcessById(int processId)
+        {
+            try
+            {
+                return Process.GetProcessById(processId);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         protected override void OnClosed(EventArgs e)
         {
             ControllerManager.Instance.Dispose();
@@ -288,11 +280,15 @@ namespace PlayniteGameOverlay
 
         public new void Hide()
         {
+            Active = false;
             // Pause timers when hiding
             PauseTimers();
 
             // Call base Hide method
-            base.Hide();
+            Dispatcher.Invoke(() =>
+            {
+                base.Hide();
+            });
         }
 
         // Navigation methods for the OverlayWindow class
@@ -315,93 +311,118 @@ namespace PlayniteGameOverlay
         }
 
         // Focus navigation methods for controller support
-        private void FocusNextElement()
+        public void FocusDown()
         {
-            UIElement focusedElement = Keyboard.FocusedElement as UIElement;
-            if (focusedElement != null)
+            Dispatcher.Invoke(() =>
             {
-                _logger.Log($"Moving focus from {focusedElement.GetType().Name} to next element", "SDL_NAV");
-                focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
-                _logger.Log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
-            }
-            else
-            {
-                _logger.Log("No element currently has focus for next navigation", "SDL_NAV");
-            }
-        }
 
-        private void FocusPreviousElement()
-        {
-            UIElement focusedElement = Keyboard.FocusedElement as UIElement;
-            if (focusedElement != null)
-            {
-                _logger.Log($"Moving focus from {focusedElement.GetType().Name} to previous element", "SDL_NAV");
-                focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Previous));
-                _logger.Log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
-            }
-            else
-            {
-                _logger.Log("No element currently has focus for previous navigation", "SDL_NAV");
-            }
-        }
-
-        private void FocusLeftElement()
-        {
-            UIElement focusedElement = Keyboard.FocusedElement as UIElement;
-            if (focusedElement != null)
-            {
-                _logger.Log($"Moving focus from {focusedElement.GetType().Name} to left element", "SDL_NAV");
-                focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Left));
-                _logger.Log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
-            }
-            else
-            {
-                _logger.Log("No element currently has focus for left navigation", "SDL_NAV");
-            }
-        }
-
-        private void FocusRightElement()
-        {
-            UIElement focusedElement = Keyboard.FocusedElement as UIElement;
-            if (focusedElement != null)
-            {
-                _logger.Log($"Moving focus from {focusedElement.GetType().Name} to right element", "SDL_NAV");
-                focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Right));
-                _logger.Log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
-            }
-            else
-            {
-                _logger.Log("No element currently has focus for right navigation", "SDL_NAV");
-            }
-        }
-
-        private void ClickFocusedElement()
-        {
-            if (Keyboard.FocusedElement is System.Windows.Controls.Button button)
-            {
-                _logger.Log($"Clicking button: {button.Name}", "SDL_NAV");
-
-                // Try to invoke the Click event handler directly if available
-                if (button.Command != null && button.Command.CanExecute(button.CommandParameter))
+                UIElement focusedElement = Keyboard.FocusedElement as UIElement;
+                if (focusedElement != null)
                 {
-                    button.Command.Execute(button.CommandParameter);
+                    _logger.Log($"Moving focus from {focusedElement.GetType().Name} to next element", "SDL_NAV");
+                    focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+                    _logger.Log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
                 }
                 else
                 {
-                    // Create a click routed event
-                    RoutedEventArgs args = new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent);
-
-                    // Raise the event on the button
-                    button.RaiseEvent(args);
+                    _logger.Log("No element currently has focus for next navigation", "SDL_NAV");
                 }
-            }
-            else
+
+            });
+}
+
+        public void FocusUp()
+        {
+            Dispatcher.Invoke(() =>
             {
-                _logger.Log($"Focused element is not a button: {Keyboard.FocusedElement?.GetType().Name ?? "null"}", "SDL_NAV");
-            }
+
+                UIElement focusedElement = Keyboard.FocusedElement as UIElement;
+                if (focusedElement != null)
+                {
+                    _logger.Log($"Moving focus from {focusedElement.GetType().Name} to previous element", "SDL_NAV");
+                    focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Previous));
+                    _logger.Log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
+                }
+                else
+                {
+                    _logger.Log("No element currently has focus for previous navigation", "SDL_NAV");
+                }
+
+            });
+        }
+
+        public void FocusLeft()
+        {
+            Dispatcher.Invoke(() =>
+            {
+
+                UIElement focusedElement = Keyboard.FocusedElement as UIElement;
+                if (focusedElement != null)
+                {
+                    _logger.Log($"Moving focus from {focusedElement.GetType().Name} to left element", "SDL_NAV");
+                    focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Left));
+                    _logger.Log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
+                }
+                else
+                {
+                    _logger.Log("No element currently has focus for left navigation", "SDL_NAV");
+                }
+
+            });
+        }
+
+        public void FocusRight()
+        {
+            Dispatcher.Invoke(() =>
+            {
+
+                UIElement focusedElement = Keyboard.FocusedElement as UIElement;
+                if (focusedElement != null)
+                {
+                    _logger.Log($"Moving focus from {focusedElement.GetType().Name} to right element", "SDL_NAV");
+                    focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Right));
+                    _logger.Log($"Focus now on: {(Keyboard.FocusedElement as FrameworkElement)?.Name ?? "unknown"}", "SDL_NAV");
+                }
+                else
+                {
+                    _logger.Log("No element currently has focus for right navigation", "SDL_NAV");
+                }
+
+            });
+        }
+
+        public void ClickFocusedElement()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (Keyboard.FocusedElement is System.Windows.Controls.Button button)
+                {
+                    _logger.Log($"Clicking button: {button.Name}", "SDL_NAV");
+
+                    // Try to invoke the Click event handler directly if available
+                    if (button.Command != null && button.Command.CanExecute(button.CommandParameter))
+                    {
+                        button.Command.Execute(button.CommandParameter);
+                    }
+                    else
+                    {
+                        // Create a click routed event
+                        RoutedEventArgs args = new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent);
+
+                        // Raise the event on the button
+                        button.RaiseEvent(args);
+                    }
+                }
+                else
+                {
+                    _logger.Log($"Focused element is not a button: {Keyboard.FocusedElement?.GetType().Name ?? "null"}", "SDL_NAV");
+                }
+            });
         }
 
         // Event to request showing Playnite (to be handled by the plugin)
         public event Action OnShowPlayniteRequested;
+        // Event to request showing the Overlay (to be handled by the plugin)
+        public event Action OnShowOverlayRequested;
     }
 }
