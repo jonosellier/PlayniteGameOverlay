@@ -36,3 +36,9 @@ Packages:
       - Improved controller performance
       - Behind the scenes big refactor
       - Additional macro buttons for game recording, performance overlay, and launching key apps
+  - Version: 0.4.2
+    RequiredApiVersion: 6.11.0.0
+    ReleaseDate: 2025-04-11
+    PackageUrl: https://github.com/jonosellier/PlayniteGameOverlay/releases/download/v0.4.2/PlayniteGameOverlay_fc75626e-ec69-4287-972a-b86298555ebb_0_4_2.pext
+    Changelog:
+      - Fix controller detection
