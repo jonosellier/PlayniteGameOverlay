@@ -171,7 +171,7 @@
                        Margin="0,5,36,0" VerticalAlignment="Top" FontSize="24" Width="74" TextAlignment="Right" />
 
             <Grid x:Name="Battery" Visibility="{Binding HasBattery, Converter={StaticResource BoolToVis}}">
-                <Rectangle x:Name="BatteryBar" HorizontalAlignment="Right" Height="17" Margin="0,13,127,0" Fill="#FF48AF30" VerticalAlignment="Top" Width="{Binding BatteryBarWidth}"/>
+                <Rectangle x:Name="BatteryBar" HorizontalAlignment="Left" Height="17" Margin="1437,13,0,0" Fill="#FF48AF30" VerticalAlignment="Top" Width="{Binding BatteryBarWidth}"/>
                 <Rectangle HorizontalAlignment="Right" Height="17" Margin="0,13,121,0" Fill="White" VerticalAlignment="Top" Width="5"/>
                 <Rectangle Stroke="White" Margin="0,9,124,0" StrokeThickness="4" Width="43" HorizontalAlignment="Right" VerticalAlignment="Top" Height="25"/>
                 <TextBlock x:Name="BatteryText" Text="{Binding BatteryPercentage, StringFormat={}{0}%}" HorizontalAlignment="Left" Margin="1436,13,0,0" TextWrapping="Wrap" VerticalAlignment="Top" FontWeight="Bold" Foreground="White" Width="37" TextAlignment="Center" Height="16"/>

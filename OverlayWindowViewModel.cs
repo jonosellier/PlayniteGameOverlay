@@ -92,8 +92,8 @@ namespace PlayniteGameOverlay
 
         public int BatteryBarWidth
         {
-            get => (int)(BatteryPercentage * 40); // Calculate width based on percentage
-        } // Assuming max width is 250px
+            get => (int)(BatteryPercentage * 0.35); // Calculate width based on percentage
+        }
 
         public bool DebugVisible
         {
