@@ -531,6 +531,8 @@ namespace PlayniteGameOverlay
 
         private void OnControllerAction(object sender, ControllerEventArgs e)
         {
+            bool startBackCombo = false;
+            bool guideActivated = false;
             System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     if (overlayWindow != null && overlayWindow.IsActive)
@@ -572,12 +574,13 @@ namespace PlayniteGameOverlay
                     }
                     else
                     {
+                        log($"Background Listener Recieved {e.EventType}: {e.ButtonName}", "SDL_INPUT");
                         // We only want to process pressed events, not repeated or released
                         if (e.EventType == ControllerEventType.Repeated)
                             return;
 
                         // For Start+Back combination or Guide button handling
-                        if (e.ButtonName == "Start" || e.ButtonName == "Back" || e.ButtonName == "Guide")
+                        if (e.EventType == ControllerEventType.Pressed && e.ButtonName == "Start" || e.ButtonName == "Back" || e.ButtonName == "Guide")
                         {
                             // Keep track of button states
                             if (e.ButtonName == "Start")
@@ -588,16 +591,17 @@ namespace PlayniteGameOverlay
                                 _guidePressed = true;
 
                             // Check for Start+Back combination
-                            bool startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
+                            startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
                                                  _startPressed && _backPressed;
 
                             // Check for Guide press
-                            bool guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
+                            guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
                                                  _guidePressed;
 
                             // Process the shortcut if either condition is met
                             if (startBackCombo || guideActivated)
                             {
+                                log($"sb:{startBackCombo}, g:{guideActivated}");
                                 // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
                                 System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                                 {
@@ -618,7 +622,7 @@ namespace PlayniteGameOverlay
                         }
 
                         // Reset button state on release
-                        if (e.EventType == ControllerEventType.Released)
+                        if (e.EventType == ControllerEventType.Released || startBackCombo || guideActivated)
                         {
                             if (e.ButtonName == "Start")
                                 _startPressed = false;

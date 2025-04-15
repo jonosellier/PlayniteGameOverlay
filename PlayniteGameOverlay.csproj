@@ -276,6 +276,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="917bd40b-a43c-439f-848c-2f82b49d8590.jpg" />
+    <Content Include="gamecontrollerdb.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Resource Include="assets\discord.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>

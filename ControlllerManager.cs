@@ -2,7 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Timers;
+using System.Linq;
+using System.Threading;
 
 namespace PlayniteGameOverlay
 {
@@ -37,15 +38,20 @@ namespace PlayniteGameOverlay
         }
 
         private readonly Logger _logger;
-        private IntPtr _controller = IntPtr.Zero;
         private bool _sdlInitialized = false;
-        private int _controllerId = -1;
-        private System.Threading.Timer _pollingTimer;
+        private Timer _pollingTimer;
 
-        // For tracking button state changes
-        private ControllerState _previousState = new ControllerState();
-        private Dictionary<string, Stopwatch> _buttonHoldTimers = new Dictionary<string, Stopwatch>();
-        private Dictionary<string, bool> _repeatFired = new Dictionary<string, bool>();
+        // For tracking controllers and their states
+        private class ControllerData
+        {
+            public int ControllerId { get; set; }
+            public IntPtr ControllerHandle { get; set; }
+            public ControllerState PreviousState { get; set; } = new ControllerState();
+            public Dictionary<string, Stopwatch> ButtonHoldTimers { get; set; } = new Dictionary<string, Stopwatch>();
+            public Dictionary<string, bool> RepeatFired { get; set; } = new Dictionary<string, bool>();
+        }
+
+        private List<ControllerData> _controllers = new List<ControllerData>();
 
         public const short DEADZONE = 10000;
         public const int DEBOUNCE_THRESHOLD = 200; // milliseconds
@@ -68,51 +74,26 @@ namespace PlayniteGameOverlay
                 _logger.Log("Initializing SDL controller support", "SDL");
 
                 // Initialize SDL with game controller support
-                if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER) < 0)
+                if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER | SDL.SDL_INIT_JOYSTICK | SDL.SDL_INIT_EVENTS) < 0)
                 {
                     string error = SDL.SDL_GetError();
                     _logger.Log($"SDL could not initialize! SDL Error: {error}", "SDL_ERROR");
                     return false;
                 }
 
+                if (SDL.SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt") == -1)
+                {
+                    _logger.Log("Failed to load game controller mappings:", "SDL_DB");
+                    _logger.Log(SDL.SDL_GetError(), "SDL_DB");
+                } 
+
                 _sdlInitialized = true;
                 _logger.Log("SDL initialized successfully", "SDL");
 
-                // Look for connected controllers
-                int numJoysticks = SDL.SDL_NumJoysticks();
-                _logger.Log($"Found {numJoysticks} joysticks/controllers", "SDL");
+                // Scan and add all connected controllers
+                ScanForControllers();
 
-                // Try to find a connected compatible controller
-                for (int i = 0; i < numJoysticks; i++)
-                {
-                    if (SDL.SDL_IsGameController(i) == SDL.SDL_bool.SDL_TRUE)
-                    {
-                        _controllerId = i;
-                        _logger.Log($"Found compatible game controller at index {i}", "SDL");
-
-                        // Open the controller here, and keep it open
-                        _controller = SDL.SDL_GameControllerOpen(_controllerId);
-                        if (_controller == IntPtr.Zero)
-                        {
-                            _logger.Log($"Could not open controller! SDL Error: {SDL.SDL_GetError()}", "SDL_ERROR");
-                            return false;
-                        }
-
-                        // Optional: Log controller mapping
-                        string mapping = SDL.SDL_GameControllerMapping(_controller);
-                        _logger.Log($"Controller mapping: {mapping}", "SDL_DEBUG");
-
-                        break;
-                    }
-                }
-
-                if (_controllerId == -1)
-                {
-                    _logger.Log("No compatible game controllers found", "SDL");
-                    return false;
-                }
-
-                return true;
+                return _controllers.Count > 0;
             }
             catch (Exception ex)
             {
@@ -122,10 +103,51 @@ namespace PlayniteGameOverlay
             }
         }
 
+        public void ScanForControllers()
+        {
+            // Look for connected controllers
+            int numJoysticks = SDL.SDL_NumJoysticks();
+            _logger.Log($"Found {numJoysticks} joysticks/controllers", "SDL");
+
+            // Try to find all connected compatible controllers
+            for (int i = 0; i < numJoysticks; i++)
+            {
+                // Skip if we already have this controller
+                if (_controllers.Exists(c => c.ControllerId == i))
+                    continue;
+
+                if (SDL.SDL_IsGameController(i) == SDL.SDL_bool.SDL_TRUE)
+                {
+                    _logger.Log($"Found compatible game controller at index {i}", "SDL");
+
+                    // Open the controller
+                    IntPtr controllerHandle = SDL.SDL_GameControllerOpen(i);
+                    if (controllerHandle == IntPtr.Zero)
+                    {
+                        _logger.Log($"Could not open controller {i}! SDL Error: {SDL.SDL_GetError()}", "SDL_ERROR");
+                        continue;
+                    }
+
+                    // Optional: Log controller mapping
+                    string mapping = SDL.SDL_GameControllerMapping(controllerHandle);
+                    _logger.Log($"Controller {i} mapping: {mapping}", "SDL_DEBUG");
+
+                    // Add this controller to our list
+                    _controllers.Add(new ControllerData
+                    {
+                        ControllerId = i,
+                        ControllerHandle = controllerHandle
+                    });
+                }
+            }
+
+            _logger.Log($"Successfully connected to {_controllers.Count} controllers", "SDL");
+        }
+
         private void StartPolling()
         {
             _logger.Log("Starting controller polling at 60Hz", "SDL");
-            _pollingTimer = new System.Threading.Timer(
+            _pollingTimer = new Timer(
                 _ => Update(),
                 null,
                 0,
@@ -134,119 +156,281 @@ namespace PlayniteGameOverlay
 
         private void Update()
         {
-            var currentState = PollInput();
-            ProcessStateChanges(currentState);
-            _previousState = currentState;
-        }
+            // Process SDL events first (handle controller connections/disconnections)
+            ProcessSDLEvents();
 
-        private void ProcessStateChanges(ControllerState currentState)
-        {
-            // Check A button
-            ProcessButton("A", _previousState.APressed, currentState.APressed);
-
-            // Check B button
-            ProcessButton("B", _previousState.BPressed, currentState.BPressed);
-
-            // Check directional inputs
-            ProcessButton("Up", _previousState.MoveUp, currentState.MoveUp);
-            ProcessButton("Down", _previousState.MoveDown, currentState.MoveDown);
-            ProcessButton("Left", _previousState.MoveLeft, currentState.MoveLeft);
-            ProcessButton("Right", _previousState.MoveRight, currentState.MoveRight);
-
-            // Check menu buttons
-            ProcessButton("Start", _previousState.StartPressed, currentState.StartPressed);
-            ProcessButton("Back", _previousState.BackPressed, currentState.BackPressed);
-            ProcessButton("Guide", _previousState.GuidePressed, currentState.GuidePressed);
-        }
-
-        private void ProcessButton(string buttonName, bool wasPressed, bool isPressed)
-        {
-            // Initialize timers if they don't exist
-            if (!_buttonHoldTimers.ContainsKey(buttonName))
+            // Update each connected controller
+            foreach (var controller in _controllers)
             {
-                _buttonHoldTimers[buttonName] = new Stopwatch();
-                _repeatFired[buttonName] = false;
-            }
-
-            // Button was just pressed
-            if (!wasPressed && isPressed)
-            {
-                _buttonHoldTimers[buttonName].Restart();
-                _repeatFired[buttonName] = false;
-                FireControllerEvent(buttonName, ControllerEventType.Pressed);
-            }
-            // Button is being held
-            else if (wasPressed && isPressed)
-            {
-                if (_buttonHoldTimers[buttonName].ElapsedMilliseconds > REPEAT_DELAY)
+                if (controller.ControllerHandle != IntPtr.Zero)
                 {
-                    FireControllerEvent(buttonName, ControllerEventType.Repeated);
-                    _buttonHoldTimers[buttonName].Restart();
+                    var currentState = PollInput(controller.ControllerHandle);
+                    ProcessStateChanges(controller, currentState);
+                    controller.PreviousState = currentState;
                 }
             }
-            // Button was just released
-            else if (wasPressed && !isPressed)
-            {
-                _buttonHoldTimers[buttonName].Stop();
-                FireControllerEvent(buttonName, ControllerEventType.Released);
-            }
         }
 
-        private void FireControllerEvent(string buttonName, ControllerEventType eventType)
+        private void ProcessSDLEvents()
         {
-            ControllerAction?.Invoke(this, new ControllerEventArgs(buttonName, eventType));
-            _logger.Log($"Controller {eventType}: {buttonName}", "SDL_EVENT");
-        }
-
-        public ControllerState PollInput()
-        {
-            var state = new ControllerState();
-
-            // Ensure that the controller is initialized and opened
-            if (_controller == IntPtr.Zero)
-            {
-                return state;
-            }
-
-            // Process SDL events
+            // Process SDL events to detect controller connections/disconnections
             SDL.SDL_Event sdlEvent;
             while (SDL.SDL_PollEvent(out sdlEvent) != 0)
             {
                 if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEADDED)
                 {
-                    _logger.Log($"Controller device added: {sdlEvent.cdevice.which}", "SDL_EVENT");
+                    int deviceIndex = sdlEvent.cdevice.which;
+                    _logger.Log($"Controller device added: {deviceIndex}", "SDL_EVENT");
+                    ScanForControllers();
                 }
                 else if (sdlEvent.type == SDL.SDL_EventType.SDL_CONTROLLERDEVICEREMOVED)
                 {
-                    _logger.Log($"Controller device removed: {sdlEvent.cdevice.which}", "SDL_EVENT");
+                    int instanceId = sdlEvent.cdevice.which;
+                    _logger.Log($"Controller device removed: {instanceId}", "SDL_EVENT");
+
+                    // Find and remove the disconnected controller
+                    for (int i = _controllers.Count - 1; i >= 0; i--)
+                    {
+                        if (_controllers[i].ControllerHandle != IntPtr.Zero)
+                        {
+                            int controllerInstanceId = SDL.SDL_JoystickInstanceID(
+                                SDL.SDL_GameControllerGetJoystick(_controllers[i].ControllerHandle));
+
+                            if (controllerInstanceId == instanceId)
+                            {
+                                SDL.SDL_GameControllerClose(_controllers[i].ControllerHandle);
+                                _controllers.RemoveAt(i);
+                                _logger.Log($"Removed disconnected controller instance: {instanceId}", "SDL");
+                                break;
+                            }
+                        }
+                    }
                 }
+            }
+        }
+
+        private void ProcessStateChanges(ControllerData controller, ControllerState currentState)
+        {
+            int controllerId = controller.ControllerId;
+
+            // Face buttons
+            ProcessButton(controller, "A", controller.PreviousState.APressed, currentState.APressed, controllerId);
+            ProcessButton(controller, "B", controller.PreviousState.BPressed, currentState.BPressed, controllerId);
+            ProcessButton(controller, "X", controller.PreviousState.XPressed, currentState.XPressed, controllerId);
+            ProcessButton(controller, "Y", controller.PreviousState.YPressed, currentState.YPressed, controllerId);
+
+            // Shoulder buttons
+            ProcessButton(controller, "LeftShoulder", controller.PreviousState.LeftShoulderPressed, currentState.LeftShoulderPressed, controllerId);
+            ProcessButton(controller, "RightShoulder", controller.PreviousState.RightShoulderPressed, currentState.RightShoulderPressed, controllerId);
+
+            // Triggers as digital buttons
+            ProcessButton(controller, "LeftTrigger", controller.PreviousState.LeftTriggerPressed, currentState.LeftTriggerPressed, controllerId);
+            ProcessButton(controller, "RightTrigger", controller.PreviousState.RightTriggerPressed, currentState.RightTriggerPressed, controllerId);
+
+            // Stick clicks
+            ProcessButton(controller, "LeftStick", controller.PreviousState.LeftStickPressed, currentState.LeftStickPressed, controllerId);
+            ProcessButton(controller, "RightStick", controller.PreviousState.RightStickPressed, currentState.RightStickPressed, controllerId);
+
+            // Menu buttons
+            ProcessButton(controller, "Start", controller.PreviousState.StartPressed, currentState.StartPressed, controllerId);
+            ProcessButton(controller, "Back", controller.PreviousState.BackPressed, currentState.BackPressed, controllerId);
+            ProcessButton(controller, "Guide", controller.PreviousState.GuidePressed, currentState.GuidePressed, controllerId);
+
+            // Primary directional inputs (left stick + d-pad)
+            ProcessButton(controller, "Up", controller.PreviousState.MoveUp, currentState.MoveUp, controllerId);
+            ProcessButton(controller, "Down", controller.PreviousState.MoveDown, currentState.MoveDown, controllerId);
+            ProcessButton(controller, "Left", controller.PreviousState.MoveLeft, currentState.MoveLeft, controllerId);
+            ProcessButton(controller, "Right", controller.PreviousState.MoveRight, currentState.MoveRight, controllerId);
+
+            // Secondary directional inputs (right stick)
+            ProcessButton(controller, "UpAlt", controller.PreviousState.MoveUpAlt, currentState.MoveUpAlt, controllerId);
+            ProcessButton(controller, "DownAlt", controller.PreviousState.MoveDownAlt, currentState.MoveDownAlt, controllerId);
+            ProcessButton(controller, "LeftAlt", controller.PreviousState.MoveLeftAlt, currentState.MoveLeftAlt, controllerId);
+            ProcessButton(controller, "RightAlt", controller.PreviousState.MoveRightAlt, currentState.MoveRightAlt, controllerId);
+
+            // Modern controller additional buttons
+            ProcessButton(controller, "Touchpad", controller.PreviousState.TouchpadPressed, currentState.TouchpadPressed, controllerId);
+            ProcessButton(controller, "Share", controller.PreviousState.SharePressed, currentState.SharePressed, controllerId);
+            ProcessButton(controller, "Misc", controller.PreviousState.MiscPressed, currentState.MiscPressed, controllerId);
+
+            // Process any custom buttons stored in the dictionary
+            if (currentState is IEnumerable<KeyValuePair<string, bool>> customButtons)
+            {
+                foreach (var pair in customButtons)
+                {
+                    bool previousValue = false;
+                    if (controller.PreviousState is IEnumerable<KeyValuePair<string, bool>> prevCustomButtons)
+                    {
+                        // Try to get the previous value if it exists
+                        foreach (var prevPair in prevCustomButtons)
+                        {
+                            if (prevPair.Key == pair.Key)
+                            {
+                                previousValue = prevPair.Value;
+                                break;
+                            }
+                        }
+                    }
+
+                    ProcessButton(controller, pair.Key, previousValue, pair.Value, controllerId);
+                }
+            }
+        }
+
+        private void ProcessButton(ControllerData controller, string buttonName, bool wasPressed, bool isPressed, int controllerId)
+        {
+            // Initialize timers if they don't exist
+            string buttonKey = buttonName;
+            if (!controller.ButtonHoldTimers.ContainsKey(buttonKey))
+            {
+                controller.ButtonHoldTimers[buttonKey] = new Stopwatch();
+                controller.RepeatFired[buttonKey] = false;
+            }
+
+            // Button was just pressed
+            if (!wasPressed && isPressed)
+            {
+                controller.ButtonHoldTimers[buttonKey].Restart();
+                controller.RepeatFired[buttonKey] = false;
+                FireControllerEvent(buttonName, ControllerEventType.Pressed, controllerId);
+            }
+            // Button is being held
+            else if (wasPressed && isPressed)
+            {
+                if (controller.ButtonHoldTimers[buttonKey].ElapsedMilliseconds > REPEAT_DELAY)
+                {
+                    FireControllerEvent(buttonName, ControllerEventType.Repeated, controllerId);
+                    controller.ButtonHoldTimers[buttonKey].Restart();
+                }
+            }
+            // Button was just released
+            else if (wasPressed && !isPressed)
+            {
+                controller.ButtonHoldTimers[buttonKey].Stop();
+                FireControllerEvent(buttonName, ControllerEventType.Released, controllerId);
+            }
+        }
+
+        private void FireControllerEvent(string buttonName, ControllerEventType eventType, int controllerId)
+        {
+            ControllerAction?.Invoke(this, new ControllerEventArgs(buttonName, eventType, controllerId));
+            _logger.Log($"Controller {controllerId} {eventType}: {buttonName}", "SDL_EVENT");
+        }
+
+        public ControllerState PollInput(IntPtr controller)
+        {
+            var state = new ControllerState();
+
+            // Ensure that the controller is initialized and opened
+            if (controller == IntPtr.Zero)
+            {
+                return state;
             }
 
             // Update the controller's state
             SDL.SDL_GameControllerUpdate();
 
-            // Check button states
-            state.APressed = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_A) == 1;
-            state.BPressed = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_B) == 1;
+            // Process any pending events to ensure we don't miss guide button presses
+            SDL.SDL_Event sdlEvent;
+            while (SDL.SDL_PollEvent(out sdlEvent) != 0)
+            {
+                // Don't let these events accumulate in the main processing loop
+                // Just process them here to keep input state fresh
+            }
+
+            // Check face buttons
+            state.APressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_A) == 1;
+            state.BPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_B) == 1;
+            state.XPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_X) == 1;
+            state.YPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_Y) == 1;
+
+            // Check shoulder buttons
+            state.LeftShoulderPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_LEFTSHOULDER) == 1;
+            state.RightShoulderPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) == 1;
+
+            // Handle digital triggers (treat as pressed if over half the range)
+            short leftTriggerValue = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+            short rightTriggerValue = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+            state.LeftTriggerPressed = leftTriggerValue > 16384; // Half of max value (32767)
+            state.RightTriggerPressed = rightTriggerValue > 16384;
+
+            // Check menu buttons
+            state.StartPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_START) == 1;
+            state.BackPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_BACK) == 1;
+
+            // Special handling for the guide button
+            try
+            {
+                // Try multiple ways to get the guide button state
+                bool guidePressed = false;
+
+                // Standard way
+                guidePressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_GUIDE) == 1;
+
+                // If that fails, try with the numerical value directly
+                if (!guidePressed)
+                {
+                    guidePressed = SDL.SDL_GameControllerGetButton(controller, (SDL.SDL_GameControllerButton)10) == 1;
+                }
+
+                // If that still fails, try yet another approach with joystick button mapping
+                if (!guidePressed && SDL.SDL_GameControllerGetAttached(controller) == SDL.SDL_bool.SDL_TRUE)
+                {
+                    IntPtr joystick = SDL.SDL_GameControllerGetJoystick(controller);
+                    if (joystick != IntPtr.Zero)
+                    {
+                        // The guide button is often mapped to button 10 on Xbox controllers
+                        guidePressed = SDL.SDL_JoystickGetButton(joystick, 10) == 1;
+                    }
+                }
+
+                state.GuidePressed = guidePressed;
+            }
+            catch
+            {
+                // Fallback if any exceptions occur
+                state.GuidePressed = false;
+            }
+
+            // Check thumbstick buttons
+            state.LeftStickPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_LEFTSTICK) == 1;
+            state.RightStickPressed = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_RIGHTSTICK) == 1;
 
             // Check D-Pad buttons
-            bool dpadUp = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_UP) == 1;
-            bool dpadDown = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_DOWN) == 1;
-            bool dpadLeft = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_LEFT) == 1;
-            bool dpadRight = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_RIGHT) == 1;
+            bool dpadUp = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_UP) == 1;
+            bool dpadDown = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_DOWN) == 1;
+            bool dpadLeft = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_LEFT) == 1;
+            bool dpadRight = SDL.SDL_GameControllerGetButton(controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_DPAD_RIGHT) == 1;
 
-            // Check analog stick values
-            short leftX = SDL.SDL_GameControllerGetAxis(_controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTX);
-            short leftY = SDL.SDL_GameControllerGetAxis(_controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTY);
+            // Check stick directions (as digital inputs)
+            short leftX = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTX);
+            short leftY = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_LEFTY);
+            short rightX = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_RIGHTX);
+            short rightY = SDL.SDL_GameControllerGetAxis(controller, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_RIGHTY);
 
-            // Combine D-Pad and Left Stick for movement detection
+            // Primary movement (D-Pad + Left Stick)
             state.MoveUp = dpadUp || leftY < -DEADZONE;
             state.MoveDown = dpadDown || leftY > DEADZONE;
             state.MoveLeft = dpadLeft || leftX < -DEADZONE;
             state.MoveRight = dpadRight || leftX > DEADZONE;
-            state.StartPressed = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_START) == 1;
-            state.BackPressed = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_BACK) == 1;
-            state.GuidePressed = SDL.SDL_GameControllerGetButton(_controller, SDL.SDL_GameControllerButton.SDL_CONTROLLER_BUTTON_GUIDE) == 1;
+
+            // Secondary movement (Right Stick as alternate D-Pad)
+            state.MoveUpAlt = rightY < -DEADZONE;
+            state.MoveDownAlt = rightY > DEADZONE;
+            state.MoveLeftAlt = rightX < -DEADZONE;
+            state.MoveRightAlt = rightX > DEADZONE;
+
+            // Modern controller additional buttons - try/catch as before
+            try
+            {
+                state.TouchpadPressed = SDL.SDL_GameControllerGetButton(controller, (SDL.SDL_GameControllerButton)15) == 1;
+                state.SharePressed = SDL.SDL_GameControllerGetButton(controller, (SDL.SDL_GameControllerButton)16) == 1;
+                state.MiscPressed = SDL.SDL_GameControllerGetButton(controller, (SDL.SDL_GameControllerButton)17) == 1;
+            }
+            catch
+            {
+                // Ignore exceptions for buttons that may not exist on all controllers
+            }
 
             return state;
         }
@@ -259,12 +443,15 @@ namespace PlayniteGameOverlay
                 _pollingTimer = null;
             }
 
-            if (_controller != IntPtr.Zero)
+            // Close all open controllers
+            foreach (var controller in _controllers)
             {
-                SDL.SDL_GameControllerClose(_controller);
-                _controller = IntPtr.Zero;
-                _logger.Log("Controller closed", "SDL");
+                if (controller.ControllerHandle != IntPtr.Zero)
+                {
+                    SDL.SDL_GameControllerClose(controller.ControllerHandle);
+                }
             }
+            _controllers.Clear();
 
             if (_sdlInitialized)
             {
@@ -291,24 +478,78 @@ namespace PlayniteGameOverlay
     {
         public string ButtonName { get; }
         public ControllerEventType EventType { get; }
+        public int ControllerId { get; }
 
-        public ControllerEventArgs(string buttonName, ControllerEventType eventType)
+        public ControllerEventArgs(string buttonName, ControllerEventType eventType, int controllerId)
         {
             ButtonName = buttonName;
             EventType = eventType;
+            ControllerId = controllerId;
         }
     }
 
     public class ControllerState
     {
+        // Face buttons
         public bool APressed { get; set; }
         public bool BPressed { get; set; }
+        public bool XPressed { get; set; }
+        public bool YPressed { get; set; }
+
+        // Shoulder buttons
+        public bool LeftShoulderPressed { get; set; }
+        public bool RightShoulderPressed { get; set; }
+        public bool LeftTriggerPressed { get; set; }  // Digital representation of analog trigger
+        public bool RightTriggerPressed { get; set; } // Digital representation of analog trigger
+
+        // Menu buttons
         public bool StartPressed { get; set; }
         public bool BackPressed { get; set; }
         public bool GuidePressed { get; set; }
+
+        // Thumbstick buttons
+        public bool LeftStickPressed { get; set; }
+        public bool RightStickPressed { get; set; }
+
+        // Primary movement (Left stick and D-pad)
         public bool MoveUp { get; set; }
         public bool MoveDown { get; set; }
         public bool MoveLeft { get; set; }
         public bool MoveRight { get; set; }
+
+        // Secondary movement (Right stick)
+        public bool MoveUpAlt { get; set; }
+        public bool MoveDownAlt { get; set; }
+        public bool MoveLeftAlt { get; set; }
+        public bool MoveRightAlt { get; set; }
+
+        // Additional buttons (for newer controllers like DualShock/DualSense)
+        public bool TouchpadPressed { get; set; }
+        public bool SharePressed { get; set; }
+        public bool MiscPressed { get; set; }  // For platform-specific additional buttons
+
+        // Dictionary for custom mapping and future compatibility
+        private Dictionary<string, bool> _buttonStates = new Dictionary<string, bool>();
+
+        // Indexer for accessing button states by name
+        public bool this[string buttonName]
+        {
+            get => _buttonStates.TryGetValue(buttonName, out bool value) ? value : false;
+            set => _buttonStates[buttonName] = value;
+        }
+
+        // Helper method to check if any button is pressed
+        public bool IsAnyButtonPressed()
+        {
+            return APressed || BPressed || XPressed || YPressed ||
+                   LeftShoulderPressed || RightShoulderPressed ||
+                   LeftTriggerPressed || RightTriggerPressed ||
+                   StartPressed || BackPressed || GuidePressed ||
+                   LeftStickPressed || RightStickPressed ||
+                   MoveUp || MoveDown || MoveLeft || MoveRight ||
+                   MoveUpAlt || MoveDownAlt || MoveLeftAlt || MoveRightAlt ||
+                   TouchpadPressed || SharePressed || MiscPressed ||
+                   _buttonStates.Values.Any(v => v);
+        }
     }
 }
