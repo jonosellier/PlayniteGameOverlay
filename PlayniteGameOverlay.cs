@@ -589,6 +589,8 @@ namespace PlayniteGameOverlay
                                 _backPressed = true;
                             else if (e.ButtonName == "Guide")
                                 _guidePressed = true;
+                            else if (e.ButtonName == "RightShoulder")
+                                _rbPressed = true;
 
                             // Check for Start+Back combination
                             startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
@@ -596,12 +598,12 @@ namespace PlayniteGameOverlay
 
                             // Check for Guide press
                             guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
-                                                 _guidePressed;
+                                                 _guidePressed && !_rbPressed;
 
+                            log($"sb:{startBackCombo}, g:{guideActivated} rb:{_rbPressed}");
                             // Process the shortcut if either condition is met
                             if (startBackCombo || guideActivated)
                             {
-                                log($"sb:{startBackCombo}, g:{guideActivated}");
                                 // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
                                 System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                                 {
@@ -621,16 +623,19 @@ namespace PlayniteGameOverlay
                             }
                         }
 
-                        // Reset button state on release
-                        if (e.EventType == ControllerEventType.Released || startBackCombo || guideActivated)
-                        {
-                            if (e.ButtonName == "Start")
-                                _startPressed = false;
-                            else if (e.ButtonName == "Back")
-                                _backPressed = false;
-                            else if (e.ButtonName == "Guide")
-                                _guidePressed = false;
-                        }
+                        
+                    }
+                    // Reset button state on release
+                    if (e.EventType == ControllerEventType.Released || startBackCombo || guideActivated)
+                    {
+                        if (e.ButtonName == "Start")
+                            _startPressed = false;
+                        else if (e.ButtonName == "Back")
+                            _backPressed = false;
+                        else if (e.ButtonName == "Guide")
+                            _guidePressed = false;
+                        else if (e.ButtonName == "RightShoulder")
+                            _rbPressed = false;
                     }
                 });
         }
@@ -639,6 +644,7 @@ namespace PlayniteGameOverlay
         private bool _startPressed = false;
         private bool _backPressed = false;
         private bool _guidePressed = false;
+        private bool _rbPressed = false;
         #endregion
 
         #region Settings

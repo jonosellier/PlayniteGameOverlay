@@ -72,7 +72,7 @@ namespace PlayniteGameOverlay
             try
             {
                 _logger.Log("Initializing SDL controller support", "SDL");
-
+                SDL.SDL_SetHint(SDL.SDL_HINT_XINPUT_ENABLED, "0");
                 // Initialize SDL with game controller support
                 if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER | SDL.SDL_INIT_JOYSTICK | SDL.SDL_INIT_EVENTS) < 0)
                 {
@@ -81,11 +81,16 @@ namespace PlayniteGameOverlay
                     return false;
                 }
 
-                if (SDL.SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt") == -1)
+                int mappingsAdded = SDL.SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
+                if (mappingsAdded == -1)
                 {
-                    _logger.Log("Failed to load game controller mappings:", "SDL_DB");
+                    _logger.Log("Failed to load game controller mappings", "SDL_DB");
                     _logger.Log(SDL.SDL_GetError(), "SDL_DB");
-                } 
+                }
+                else
+                {
+                    _logger.Log($"Loaded {mappingsAdded} controller mapping(s)", "SDL_DB");
+                }
 
                 _sdlInitialized = true;
                 _logger.Log("SDL initialized successfully", "SDL");
@@ -160,14 +165,19 @@ namespace PlayniteGameOverlay
             ProcessSDLEvents();
 
             // Update each connected controller
-            foreach (var controller in _controllers)
+            try
             {
-                if (controller.ControllerHandle != IntPtr.Zero)
+                foreach (var controller in _controllers)
                 {
-                    var currentState = PollInput(controller.ControllerHandle);
-                    ProcessStateChanges(controller, currentState);
-                    controller.PreviousState = currentState;
+                    if (controller.ControllerHandle != IntPtr.Zero)
+                    {
+                        var currentState = PollInput(controller.ControllerHandle);
+                        ProcessStateChanges(controller, currentState);
+                        controller.PreviousState = currentState;
+                    }
                 }
+            }
+            catch { 
             }
         }
 
@@ -283,8 +293,15 @@ namespace PlayniteGameOverlay
             string buttonKey = buttonName;
             if (!controller.ButtonHoldTimers.ContainsKey(buttonKey))
             {
-                controller.ButtonHoldTimers[buttonKey] = new Stopwatch();
-                controller.RepeatFired[buttonKey] = false;
+                try
+                {
+                    controller.ButtonHoldTimers[buttonKey] = new Stopwatch();
+                    controller.RepeatFired[buttonKey] = false;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Log($"Error initializing button timers for {buttonKey}: {ex.Message}", "SDL_ERROR");
+                }
             }
 
             // Button was just pressed
