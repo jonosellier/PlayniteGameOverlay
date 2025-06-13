@@ -11,8 +11,6 @@ using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
-using SDL2;
-using System.Windows.Threading;
 using System.ComponentModel;
 
 namespace PlayniteGameOverlay
@@ -28,6 +26,8 @@ namespace PlayniteGameOverlay
         private OverlayWindow overlayWindow;
         private IPlayniteAPI playniteAPI;
         private GlobalKeyboardHook keyboardHook;
+
+        private ControllerState controllerState = new ControllerState();
 
         public override Guid Id { get; } = Guid.Parse("fc75626e-ec69-4287-972a-b86298555ebb");
 
@@ -61,7 +61,100 @@ namespace PlayniteGameOverlay
         }
 
 
+        public override void OnControllerButtonStateChanged(OnControllerButtonStateChangedArgs args)
+        {
+            var mostRecentPress = controllerState.Update(args);
+            var startBackCombo = false;
+            var guideActivated = false;
 
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (overlayWindow != null && overlayWindow.IsActive)
+                {
+                    // Log all controller actions
+                    log($"Window Recieved {args.State.ToString()}: {args.Button.ToString()}", "SDL_INPUT");
+
+                    // ignore releases
+                    if (mostRecentPress == null)
+                        return;
+
+                    switch (mostRecentPress)
+                    {
+                        case ControllerInput.DPadUp:
+                        case ControllerInput.LeftStickUp:
+                            log("Navigating UP", "SDL_NAV");
+                            overlayWindow.FocusUp();
+                            break;
+                        case ControllerInput.DPadDown:
+                        case ControllerInput.LeftStickDown:
+                            log("Navigating DOWN", "SDL_NAV");
+                            overlayWindow.FocusDown();
+                            break;
+                        case ControllerInput.DPadLeft:
+                        case ControllerInput.LeftStickLeft:
+                            log("Navigating LEFT", "SDL_NAV");
+                            overlayWindow.FocusLeft();
+                            break;
+                        case ControllerInput.DPadRight:
+                        case ControllerInput.LeftStickRight:
+                            log("Navigating RIGHT", "SDL_NAV");
+                            overlayWindow.FocusRight();
+                            break;
+                        case ControllerInput.A:
+                            log("Button A pressed - clicking focused element", "SDL_NAV");
+                            overlayWindow.ClickFocusedElement();
+                            break;
+                        case ControllerInput.B:
+                            log("Button B pressed - Hiding overlay", "SDL_NAV");
+                            overlayWindow.Hide();
+                            break;
+                    }
+                }
+                else
+                {
+                    log($"Background Listener Recieved {args.State.ToString()}: {args.Button.ToString()}", "SDL_INPUT");
+                    // We only want to process pressed events, not repeated or released
+                    if (mostRecentPress == null)
+                        return;
+
+                    // For Start+Back combination or Guide button handling
+                    if (mostRecentPress == ControllerInput.Start || mostRecentPress == ControllerInput.Back || mostRecentPress == ControllerInput.Guide)
+                    {
+                        // Check for Start+Back combination
+                        startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
+                                             controllerState.ButtonStart && controllerState.ButtonBack;
+
+                        // Check for Guide press
+                        guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
+                                             controllerState.ButtonGuide;
+
+                        log($"sb:{startBackCombo}, g:{guideActivated}");
+                        // Process the shortcut if either condition is met
+                        if (startBackCombo || guideActivated)
+                        {
+                            // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
+                            System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+                                if (runningGame != null)
+                                {
+                                    if (overlayWindow.IsVisible)
+                                        overlayWindow.Hide();
+                                    else
+                                        ShowGameOverlay(runningGame);
+                                }
+                                else
+                                {
+                                    ShowPlaynite(true);
+                                }
+                            }));
+                        }
+                    }
+
+
+                }
+            });
+        }
 
         public PlayniteGameOverlay(IPlayniteAPI api) : base(api)
         {
@@ -86,12 +179,10 @@ namespace PlayniteGameOverlay
             // Initialize global keyboard hook
             keyboardHook = new GlobalKeyboardHook();
             keyboardHook.KeyPressed += OnKeyPressed;
-            InitializeController();
         }
 
         public void ReloadOverlay(OverlaySettings settings)
         {
-            ControllerManager.Initialize(settings.DebugMode);
             overlayWindow.Close(); //close old window
             overlayWindow = new OverlayWindow(settings != null ? settings : Settings); //open new one
             overlayWindow.Hide();
@@ -518,135 +609,6 @@ namespace PlayniteGameOverlay
             return achievements;
         }
 
-        #region Controller
-        private void InitializeController()
-        {
-            // Initialize singleton with your logger
-            ControllerManager.Initialize(settings.DebugMode);
-
-            // Subscribe to controller events
-            ControllerManager.Instance.ControllerAction += OnControllerAction;
-        }
-
-
-        private void OnControllerAction(object sender, ControllerEventArgs e)
-        {
-            bool startBackCombo = false;
-            bool guideActivated = false;
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                {
-                    if (overlayWindow != null && overlayWindow.IsActive)
-                    {
-                        // Log all controller actions
-                        log($"Window Recieved {e.EventType}: {e.ButtonName}", "SDL_INPUT");
-
-                        // Only process button presses and repeats (ignore releases)
-                        if (e.EventType == ControllerEventType.Released)
-                            return;
-
-                        switch (e.ButtonName)
-                        {
-                            case "Up":
-                                log("Navigating UP", "SDL_NAV");
-                                overlayWindow.FocusUp();
-                                break;
-                            case "Down":
-                                log("Navigating DOWN", "SDL_NAV");
-                                overlayWindow.FocusDown();
-                                break;
-                            case "Left":
-                                log("Navigating LEFT", "SDL_NAV");
-                                overlayWindow.FocusLeft();
-                                break;
-                            case "Right":
-                                log("Navigating RIGHT", "SDL_NAV");
-                                overlayWindow.FocusRight();
-                                break;
-                            case "A":
-                                log("Button A pressed - clicking focused element", "SDL_NAV");
-                                overlayWindow.ClickFocusedElement();
-                                break;
-                            case "B":
-                                log("Button B pressed - Hiding overlay", "SDL_NAV");
-                                overlayWindow.Hide();
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        log($"Background Listener Recieved {e.EventType}: {e.ButtonName}", "SDL_INPUT");
-                        // We only want to process pressed events, not repeated or released
-                        if (e.EventType == ControllerEventType.Repeated)
-                            return;
-
-                        // For Start+Back combination or Guide button handling
-                        if (e.EventType == ControllerEventType.Pressed && e.ButtonName == "Start" || e.ButtonName == "Back" || e.ButtonName == "Guide")
-                        {
-                            // Keep track of button states
-                            if (e.ButtonName == "Start")
-                                _startPressed = true;
-                            else if (e.ButtonName == "Back")
-                                _backPressed = true;
-                            else if (e.ButtonName == "Guide")
-                                _guidePressed = true;
-                            else if (e.ButtonName == "RightShoulder")
-                                _rbPressed = true;
-
-                            // Check for Start+Back combination
-                            startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
-                                                 _startPressed && _backPressed;
-
-                            // Check for Guide press
-                            guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
-                                                 _guidePressed && !_rbPressed;
-
-                            log($"sb:{startBackCombo}, g:{guideActivated} rb:{_rbPressed}");
-                            // Process the shortcut if either condition is met
-                            if (startBackCombo || guideActivated)
-                            {
-                                // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
-                                System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                                {
-                                    var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
-                                    if (runningGame != null)
-                                    {
-                                        if (overlayWindow.IsVisible)
-                                            overlayWindow.Hide();
-                                        else
-                                            ShowGameOverlay(runningGame);
-                                    }
-                                    else
-                                    {
-                                        ShowPlaynite(true);
-                                    }
-                                }));
-                            }
-                        }
-
-                        
-                    }
-                    // Reset button state on release
-                    if (e.EventType == ControllerEventType.Released || startBackCombo || guideActivated)
-                    {
-                        if (e.ButtonName == "Start")
-                            _startPressed = false;
-                        else if (e.ButtonName == "Back")
-                            _backPressed = false;
-                        else if (e.ButtonName == "Guide")
-                            _guidePressed = false;
-                        else if (e.ButtonName == "RightShoulder")
-                            _rbPressed = false;
-                    }
-                });
-        }
-
-        // Class-level fields to track button states
-        private bool _startPressed = false;
-        private bool _backPressed = false;
-        private bool _guidePressed = false;
-        private bool _rbPressed = false;
-        #endregion
-
         #region Settings
         public override ISettings GetSettings(bool firstRunSettings)
         {
@@ -1006,5 +968,126 @@ namespace PlayniteGameOverlay
         Portrait,
         Landscape,
         Square
+    }
+
+    public class ControllerState
+    {
+        public bool ButtonA { get; set; }
+        public bool ButtonB { get; set; }
+        public bool ButtonX { get; set; }
+        public bool ButtonY { get; set; }
+        public bool ButtonStart { get; set; }
+        public bool ButtonBack { get; set; }
+        public bool ButtonLeftBumper { get; set; }
+        public bool ButtonRightBumper { get; set; }
+        public Direction LeftStick { get; set; }
+        public Direction RightStick { get; set; }
+        public bool ButtonDPadUp { get; set; }
+        public bool ButtonDPadDown { get; set; }
+        public bool ButtonDPadLeft { get; set; }
+        public bool ButtonDPadRight { get; set; }
+        public bool ButtonGuide { get; set; } // Xbox Guide button
+        public bool ButtonLeftTrigger { get; set; }
+        public bool ButtonRightTrigger { get; set; }
+
+        public ControllerInput? Update(OnControllerButtonStateChangedArgs args)
+        {
+            if (args == null || args.Button == null)
+            {
+                return null;
+            }
+            var pressed = args.State == ControllerInputState.Pressed;
+            switch (args.Button)
+            {
+                case ControllerInput.A:
+                    ButtonA = pressed;
+                    break;
+                case ControllerInput.B:
+                    ButtonB = pressed;
+                    break;
+                case ControllerInput.X:
+                    ButtonX = pressed;
+                    break;
+                case ControllerInput.Y:
+                    ButtonY = pressed;
+                    break;
+                case ControllerInput.Start:
+                    ButtonStart = pressed;
+                    break;
+                case ControllerInput.Back:
+                    ButtonBack = pressed;
+                    break;
+                case ControllerInput.LeftShoulder:
+                    ButtonLeftBumper = pressed;
+                    break;
+                case ControllerInput.RightShoulder:
+                    ButtonRightBumper = pressed;
+                    break;
+                case ControllerInput.TriggerLeft:
+                    ButtonLeftTrigger = pressed;
+                    break;
+                case ControllerInput.TriggerRight:
+                    ButtonRightTrigger = pressed;
+                    break;
+                case ControllerInput.DPadUp:
+                    ButtonDPadUp = pressed;
+                    break;
+                case ControllerInput.DPadDown:
+                    ButtonDPadDown = pressed;
+                    break;
+                case ControllerInput.DPadLeft:
+                    ButtonDPadLeft = pressed;
+                    break;
+                case ControllerInput.DPadRight:
+                    ButtonDPadRight = pressed;
+                    break;
+                case ControllerInput.Guide:
+                    ButtonGuide = pressed; // Xbox Guide button
+                    break;
+                case ControllerInput.LeftStickRight:
+                    LeftStick = pressed ? Direction.Right : Direction.None;
+                    break;
+                case ControllerInput.LeftStickLeft:
+                    LeftStick = pressed ? Direction.Left : Direction.None;
+                    break;
+                case ControllerInput.LeftStickUp:
+                    LeftStick = pressed ? Direction.Up : Direction.None;
+                    break;
+                case ControllerInput.LeftStickDown:
+                    LeftStick = pressed ? Direction.Down : Direction.None;
+                    break;
+                case ControllerInput.RightStickRight:
+                    RightStick = pressed ? Direction.Right : Direction.None;
+                    break;
+                case ControllerInput.RightStickLeft:
+                    RightStick = pressed ? Direction.Left : Direction.None;
+                    break;
+                case ControllerInput.RightStickUp:
+                    RightStick = pressed ? Direction.Up : Direction.None;
+                    break;
+                case ControllerInput.RightStickDown:
+                    RightStick = pressed ? Direction.Down : Direction.None;
+                    break;
+            }
+
+            if (pressed)
+            {
+                return args.Button;
+            }
+            else
+            {
+                // Return null if the button was released
+                return null;
+            }
+        }
+    }
+
+    public enum Direction
+    {
+        Up,
+        Down,
+        Left,
+        Right,
+        None
     }
 }
