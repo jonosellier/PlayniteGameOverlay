@@ -11,8 +11,6 @@ using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
-using SDL2;
-using System.Windows.Threading;
 using System.ComponentModel;
 
 namespace PlayniteGameOverlay
@@ -28,6 +26,8 @@ namespace PlayniteGameOverlay
         private OverlayWindow overlayWindow;
         private IPlayniteAPI playniteAPI;
         private GlobalKeyboardHook keyboardHook;
+
+        private ControllerState controllerState = new ControllerState();
 
         public override Guid Id { get; } = Guid.Parse("fc75626e-ec69-4287-972a-b86298555ebb");
 
@@ -61,7 +61,100 @@ namespace PlayniteGameOverlay
         }
 
 
+        public override void OnControllerButtonStateChanged(OnControllerButtonStateChangedArgs args)
+        {
+            var mostRecentPress = controllerState.Update(args);
+            var startBackCombo = false;
+            var guideActivated = false;
 
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (overlayWindow != null && overlayWindow.IsActive)
+                {
+                    // Log all controller actions
+                    log($"Window Recieved {args.State.ToString()}: {args.Button.ToString()}", "SDL_INPUT");
+
+                    // ignore releases
+                    if (mostRecentPress == null)
+                        return;
+
+                    switch (mostRecentPress)
+                    {
+                        case ControllerInput.DPadUp:
+                        case ControllerInput.LeftStickUp:
+                            log("Navigating UP", "SDL_NAV");
+                            overlayWindow.FocusUp();
+                            break;
+                        case ControllerInput.DPadDown:
+                        case ControllerInput.LeftStickDown:
+                            log("Navigating DOWN", "SDL_NAV");
+                            overlayWindow.FocusDown();
+                            break;
+                        case ControllerInput.DPadLeft:
+                        case ControllerInput.LeftStickLeft:
+                            log("Navigating LEFT", "SDL_NAV");
+                            overlayWindow.FocusLeft();
+                            break;
+                        case ControllerInput.DPadRight:
+                        case ControllerInput.LeftStickRight:
+                            log("Navigating RIGHT", "SDL_NAV");
+                            overlayWindow.FocusRight();
+                            break;
+                        case ControllerInput.A:
+                            log("Button A pressed - clicking focused element", "SDL_NAV");
+                            overlayWindow.ClickFocusedElement();
+                            break;
+                        case ControllerInput.B:
+                            log("Button B pressed - Hiding overlay", "SDL_NAV");
+                            overlayWindow.Hide();
+                            break;
+                    }
+                }
+                else
+                {
+                    log($"Background Listener Recieved {args.State.ToString()}: {args.Button.ToString()}", "SDL_INPUT");
+                    // We only want to process pressed events, not repeated or released
+                    if (mostRecentPress == null)
+                        return;
+
+                    // For Start+Back combination or Guide button handling
+                    if (mostRecentPress == ControllerInput.Start || mostRecentPress == ControllerInput.Back || mostRecentPress == ControllerInput.Guide)
+                    {
+                        // Check for Start+Back combination
+                        startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
+                                             controllerState.ButtonStart && controllerState.ButtonBack;
+
+                        // Check for Guide press
+                        guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
+                                             controllerState.ButtonGuide;
+
+                        log($"sb:{startBackCombo}, g:{guideActivated}");
+                        // Process the shortcut if either condition is met
+                        if (startBackCombo || guideActivated)
+                        {
+                            // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
+                            System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
+                                if (runningGame != null)
+                                {
+                                    if (overlayWindow.IsVisible)
+                                        overlayWindow.Hide();
+                                    else
+                                        ShowGameOverlay(runningGame);
+                                }
+                                else
+                                {
+                                    ShowPlaynite(true);
+                                }
+                            }));
+                        }
+                    }
+
+
+                }
+            });
+        }
 
         public PlayniteGameOverlay(IPlayniteAPI api) : base(api)
         {
@@ -86,12 +179,10 @@ namespace PlayniteGameOverlay
             // Initialize global keyboard hook
             keyboardHook = new GlobalKeyboardHook();
             keyboardHook.KeyPressed += OnKeyPressed;
-            InitializeController();
         }
 
         public void ReloadOverlay(OverlaySettings settings)
         {
-            ControllerManager.Initialize(settings.DebugMode);
             overlayWindow.Close(); //close old window
             overlayWindow = new OverlayWindow(settings != null ? settings : Settings); //open new one
             overlayWindow.Hide();
@@ -165,7 +256,7 @@ namespace PlayniteGameOverlay
         {
             //if (game == null) return;
 
-            var gameOverlayData = CreateGameOverlayData(game, FindRunningGameProcess(game)?.Id, gameStarted);
+            var gameOverlayData = CreateGameOverlayData(game, FindRunningGameProcess(game, null)?.Id, gameStarted);
             overlayWindow.UpdateGameOverlay(gameOverlayData);
             overlayWindow.ShowOverlay();
         }
@@ -250,50 +341,118 @@ namespace PlayniteGameOverlay
             }
         }
 
-        private Process FindRunningGameProcess(Game game)
+        private static Process FindRunningGameProcess(Game game, int? pid)
         {
             if (game == null) return null;
 
             try
             {
+                // Get process tree starting from the provided PID
+                var processTree = GetProcessTree(pid);
+
                 // Get all executable files in the game installation directory and subdirectories
-                var gameExecutables = new List<string>();
-                try
-                {
-                    gameExecutables = Directory.GetFiles(game.InstallDirectory, "*.exe", SearchOption.AllDirectories)
-                        .Select(path => Path.GetFileNameWithoutExtension(path))
-                        .ToList();
-
-                    // Add common variations
-                    var additionalNames = new List<string>();
-                    foreach (var exe in gameExecutables)
-                    {
-                        // Add variations like "game-win64", "game_launcher", etc.
-                        additionalNames.Add(exe.Replace("-", ""));
-                        additionalNames.Add(exe.Replace("_", ""));
-                        additionalNames.Add(exe.Replace(" ", ""));
-                        additionalNames.Add(exe.Replace("-", " "));
-                        additionalNames.Add(exe.Replace("_", " "));
-                        additionalNames.Add(exe.Replace(" ", " "));
-                    }
-                    gameExecutables.AddRange(additionalNames);
-
-                    log($"Found {gameExecutables.Count} potential game executables in {game.InstallDirectory}");
-                }
-                catch (Exception ex)
-                {
-                    logger.Error($"Error scanning game directory: {ex.Message}");
-                }
+                var gameExecutables = GetGameExecutables(game);
 
                 // Get the game name words for title comparison
                 string gameName = game.Name;
                 string[] gameNameWords = gameName.ToLower().Split(new char[] { ' ', '-', '_', ':', '.', '(', ')', '[', ']' },
                     StringSplitOptions.RemoveEmptyEntries);
 
-                log($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
+                logger.Debug($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
+                logger.Debug($"Process tree contains {processTree.Count} processes");
 
-                // Get all processes with main window
-                Process[] allProcesses = Process.GetProcesses()
+                // Filter process tree to only include processes with main windows and sufficient memory
+                var candidateProcesses = processTree.Where(p =>
+                {
+                    try
+                    {
+                        return !p.HasExited &&
+                               p.MainWindowHandle != IntPtr.Zero &&
+                               !string.IsNullOrEmpty(p.MainWindowTitle) &&
+                               p.WorkingSet64 > 100 * 1024 * 1024;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }).ToList();
+
+                logger.Debug($"Found {candidateProcesses.Count} candidate processes in tree");
+
+                var candidates = new List<Process>();
+                var nameMatchCandidates = new List<Process>();
+                var titleMatchCandidates = new List<(Process Process, int MatchCount)>();
+                var inaccessibleCandidates = new List<Process>();
+
+                foreach (var p in candidateProcesses)
+                {
+                    try
+                    {
+                        // Check if process name matches any executable in the game folder
+                        bool nameMatches = gameExecutables.Any(exe =>
+                            string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase));
+
+                        // Check window title for matches with game name
+                        int titleMatchScore = CalculateTitleMatchScore(p, gameNameWords);
+
+                        try
+                        {
+                            // Try to access the module info
+                            var modulePath = p.MainModule.FileName;
+                            if (modulePath.IndexOf(game.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                candidates.Add(p);
+                            }
+                            else if (nameMatches)
+                            {
+                                nameMatchCandidates.Add(p);
+                            }
+                            else if (titleMatchScore > 0)
+                            {
+                                titleMatchCandidates.Add((p, titleMatchScore));
+                            }
+                        }
+                        catch
+                        {
+                            // Can't access module info (likely due to 32/64 bit mismatch)
+                            if (nameMatches)
+                            {
+                                nameMatchCandidates.Add(p);
+                            }
+                            else if (titleMatchScore > 0)
+                            {
+                                titleMatchCandidates.Add((p, titleMatchScore));
+                            }
+                            else
+                            {
+                                inaccessibleCandidates.Add(p);
+                            }
+                        }
+                    }
+                    catch { /* Skip processes we can't access at all */ }
+                }
+
+                // Priority order: direct path match, window title match, process name match, then best guess
+                var bestMatch = FindBestMatch(candidates, titleMatchCandidates, nameMatchCandidates, inaccessibleCandidates, pid);
+
+                return bestMatch;
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error finding game process: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static List<Process> GetProcessTree(int? rootPid)
+        {
+            var processTree = new List<Process>();
+
+            if (rootPid == null || rootPid <= 0)
+            {
+                logger.Debug("No root PID provided, using all processes with main windows");
+                // Fallback to all processes with main windows if no PID provided
+                return Process.GetProcesses()
                     .Where(p =>
                     {
                         try
@@ -305,116 +464,181 @@ namespace PlayniteGameOverlay
                             return false;
                         }
                     })
-                    .ToArray();
+                    .ToList();
+            }
 
-                var candidates = new List<Process>();
-                var nameMatchCandidates = new List<Process>();
-                var titleMatchCandidates = new List<(Process Process, int MatchCount)>();
-                var inaccessibleCandidates = new List<Process>();
-
-                DateTime gameStartTime = DateTime.Now; // Use current time as fallback
-
-                foreach (var p in allProcesses)
+            try
+            {
+                // Start with the root process
+                var rootProcess = Process.GetProcessById(rootPid.Value);
+                if (rootProcess != null && !rootProcess.HasExited)
                 {
-                    try
-                    {
-                        // Check memory usage first
-                        if (!p.HasExited && p.WorkingSet64 > 100 * 1024 * 1024)
-                        {
-                            // Check if process name matches any executable in the game folder
-                            bool nameMatches = gameExecutables.Any(exe =>
-                                string.Equals(exe, p.ProcessName, StringComparison.OrdinalIgnoreCase));
-
-                            // Check window title for matches with game name
-                            int titleMatchScore = 0;
-                            if (p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
-                            {
-                                string[] windowTitleWords = p.MainWindowTitle.ToLower().Split(new char[] { ' ', '-', '_', ':', '.', '(', ')', '[', ']' },
-                                    StringSplitOptions.RemoveEmptyEntries);
-
-                                // Count how many words from the game name appear in the window title
-                                titleMatchScore = gameNameWords.Count(gameWord =>
-                                    windowTitleWords.Any(titleWord => titleWord.Contains(gameWord) || gameWord.Contains(titleWord)));
-                            }
-
-                            try
-                            {
-                                // Try to access the module info
-                                var modulePath = p.MainModule.FileName;
-                                if (modulePath.IndexOf(game.InstallDirectory, StringComparison.OrdinalIgnoreCase) >= 0)
-                                {
-                                    candidates.Add(p);
-                                }
-                                else if (nameMatches)
-                                {
-                                    // Path doesn't match but name does - this is a good candidate
-                                    nameMatchCandidates.Add(p);
-                                }
-                                else if (titleMatchScore > 0)
-                                {
-                                    // Window title matches game name
-                                    titleMatchCandidates.Add((p, titleMatchScore));
-                                }
-                            }
-                            catch
-                            {
-                                // Can't access module info (likely due to 32/64 bit mismatch)
-                                if (nameMatches)
-                                {
-                                    // Process name matches executable - higher priority
-                                    nameMatchCandidates.Add(p);
-                                }
-                                else if (titleMatchScore > 0)
-                                {
-                                    // Window title matches game name
-                                    titleMatchCandidates.Add((p, titleMatchScore));
-                                }
-                                else
-                                {
-                                    // No name match, but memory usage matches
-                                    inaccessibleCandidates.Add(p);
-                                }
-                            }
-                        }
-                    }
-                    catch { /* Skip processes we can't access at all */ }
-                }
-
-                // Priority order: direct path match, window title match, process name match, then best guess
-                if (candidates.Count > 0)
-                {
-                    var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
-                    log($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
-                    return bestMatch;
-                }
-
-                if (titleMatchCandidates.Count > 0)
-                {
-                    // Get the process with the highest title match score
-                    var bestMatch = titleMatchCandidates.OrderByDescending(t => t.MatchCount)
-                                                        .ThenByDescending(t => t.Process.WorkingSet64)
-                                                        .First().Process;
-                    log($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
-                    return bestMatch;
-                }
-
-                if (nameMatchCandidates.Count > 0)
-                {
-                    var bestMatch = nameMatchCandidates.OrderByDescending(p => p.WorkingSet64).First();
-                    log($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
-                    return bestMatch;
-                }
-
-                if (inaccessibleCandidates.Count > 0)
-                {
-                    var bestGuess = inaccessibleCandidates.OrderByDescending(p => p.WorkingSet64).First();
-                    log($"Using best guess process: {bestGuess.ProcessName} (ID: {bestGuess.Id})");
-                    return bestGuess;
+                    processTree.Add(rootProcess);
+                    logger.Debug($"Added root process: {rootProcess.ProcessName} (ID: {rootProcess.Id})");
                 }
             }
             catch (Exception ex)
             {
-                log($"Error finding game process: {ex.Message}", "ERROR");
+                logger.Warn($"Could not find root process with ID {rootPid}: {ex.Message}");
+            }
+
+            // Get all child processes recursively
+            var allProcesses = Process.GetProcesses();
+            var processesById = allProcesses.ToDictionary(p => p.Id, p => p);
+            var childProcesses = GetChildProcesses(rootPid.Value, processesById);
+
+            processTree.AddRange(childProcesses);
+
+            logger.Debug($"Process tree built with {processTree.Count} total processes");
+            return processTree;
+        }
+
+        private static List<Process> GetChildProcesses(int parentId, Dictionary<int, Process> processesById)
+        {
+            var children = new List<Process>();
+
+            try
+            {
+                // Use P/Invoke to get child processes via Windows API
+                foreach (var process in processesById.Values)
+                {
+                    try
+                    {
+                        if (!process.HasExited && GetParentProcessId(process.Id) == parentId)
+                        {
+                            children.Add(process);
+                            logger.Debug($"Added child process: {process.ProcessName} (ID: {process.Id})");
+
+                            // Recursively get grandchildren
+                            children.AddRange(GetChildProcesses(process.Id, processesById));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Debug($"Error checking process {process.Id}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Debug($"Error getting child processes for PID {parentId}: {ex.Message}");
+            }
+
+            return children;
+        }
+
+        private static int GetParentProcessId(int processId)
+        {
+            try
+            {
+                var handle = OpenProcess(ProcessAccessFlags.QueryInformation, false, processId);
+                if (handle == IntPtr.Zero)
+                    return -1;
+
+                try
+                {
+                    var pbi = new PROCESS_BASIC_INFORMATION();
+                    int returnLength;
+                    int status = NtQueryInformationProcess(handle, 0, ref pbi, Marshal.SizeOf(pbi), out returnLength);
+
+                    if (status == 0)
+                        return pbi.InheritedFromUniqueProcessId.ToInt32();
+                }
+                finally
+                {
+                    CloseHandle(handle);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Debug($"Error getting parent PID for process {processId}: {ex.Message}");
+            }
+
+            return -1;
+        }
+
+        private static List<string> GetGameExecutables(Game game)
+        {
+            var gameExecutables = new List<string>();
+            try
+            {
+                gameExecutables = Directory.GetFiles(game.InstallDirectory, "*.exe", SearchOption.AllDirectories)
+                    .Select(path => Path.GetFileNameWithoutExtension(path))
+                    .ToList();
+
+                // Add common variations
+                var additionalNames = new List<string>();
+                foreach (var exe in gameExecutables)
+                {
+                    additionalNames.Add(exe.Replace("-", ""));
+                    additionalNames.Add(exe.Replace("_", ""));
+                    additionalNames.Add(exe.Replace(" ", ""));
+                    additionalNames.Add(exe.Replace("-", " "));
+                    additionalNames.Add(exe.Replace("_", " "));
+                }
+                gameExecutables.AddRange(additionalNames);
+
+                logger.Debug($"Found {gameExecutables.Count} potential game executables in {game.InstallDirectory}");
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error scanning game directory: {ex.Message}");
+            }
+
+            return gameExecutables;
+        }
+
+        private static int CalculateTitleMatchScore(Process process, string[] gameNameWords)
+        {
+            if (process.MainWindowHandle == IntPtr.Zero || string.IsNullOrEmpty(process.MainWindowTitle))
+                return 0;
+
+            string[] windowTitleWords = process.MainWindowTitle.ToLower().Split(
+                new char[] { ' ', '-', '_', ':', '.', '(', ')', '[', ']' },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            return gameNameWords.Count(gameWord =>
+                windowTitleWords.Any(titleWord => titleWord.Contains(gameWord) || gameWord.Contains(titleWord)));
+        }
+
+        private static Process FindBestMatch(
+            List<Process> candidates,
+            List<(Process Process, int MatchCount)> titleMatchCandidates,
+            List<Process> nameMatchCandidates,
+            List<Process> inaccessibleCandidates,
+            int? originalPid)
+        {
+            if (candidates.Count > 0)
+            {
+                var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
+                logger.Debug($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                return bestMatch;
+            }
+
+            if (titleMatchCandidates.Count > 0)
+            {
+                var bestMatch = titleMatchCandidates.OrderByDescending(t => t.MatchCount)
+                                                    .ThenByDescending(t => t.Process.WorkingSet64)
+                                                    .First().Process;
+                logger.Debug($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
+                return bestMatch;
+            }
+
+            if (nameMatchCandidates.Count > 0)
+            {
+                var bestMatch = nameMatchCandidates.OrderByDescending(p => p.WorkingSet64).First();
+                logger.Debug($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                return bestMatch;
+            }
+
+            if (inaccessibleCandidates.Count > 0)
+            {
+                var processFromPlaynite = inaccessibleCandidates.FirstOrDefault(p => p.Id == originalPid);
+                if (processFromPlaynite != null)
+                {
+                    logger.Debug($"Found original process in tree: {processFromPlaynite.ProcessName} (ID: {processFromPlaynite.Id})");
+                    return processFromPlaynite;
+                }
             }
 
             return null;
@@ -518,125 +742,6 @@ namespace PlayniteGameOverlay
             return achievements;
         }
 
-        #region Controller
-        private void InitializeController()
-        {
-            // Initialize singleton with your logger
-            ControllerManager.Initialize(settings.DebugMode);
-
-            // Subscribe to controller events
-            ControllerManager.Instance.ControllerAction += OnControllerAction;
-        }
-
-
-        private void OnControllerAction(object sender, ControllerEventArgs e)
-        {
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                {
-                    if (overlayWindow != null && overlayWindow.IsActive)
-                    {
-                        // Log all controller actions
-                        log($"Window Recieved {e.EventType}: {e.ButtonName}", "SDL_INPUT");
-
-                        // Only process button presses and repeats (ignore releases)
-                        if (e.EventType == ControllerEventType.Released)
-                            return;
-
-                        switch (e.ButtonName)
-                        {
-                            case "Up":
-                                log("Navigating UP", "SDL_NAV");
-                                overlayWindow.FocusUp();
-                                break;
-                            case "Down":
-                                log("Navigating DOWN", "SDL_NAV");
-                                overlayWindow.FocusDown();
-                                break;
-                            case "Left":
-                                log("Navigating LEFT", "SDL_NAV");
-                                overlayWindow.FocusLeft();
-                                break;
-                            case "Right":
-                                log("Navigating RIGHT", "SDL_NAV");
-                                overlayWindow.FocusRight();
-                                break;
-                            case "A":
-                                log("Button A pressed - clicking focused element", "SDL_NAV");
-                                overlayWindow.ClickFocusedElement();
-                                break;
-                            case "B":
-                                log("Button B pressed - Hiding overlay", "SDL_NAV");
-                                overlayWindow.Hide();
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        // We only want to process pressed events, not repeated or released
-                        if (e.EventType == ControllerEventType.Repeated)
-                            return;
-
-                        // For Start+Back combination or Guide button handling
-                        if (e.ButtonName == "Start" || e.ButtonName == "Back" || e.ButtonName == "Guide")
-                        {
-                            // Keep track of button states
-                            if (e.ButtonName == "Start")
-                                _startPressed = true;
-                            else if (e.ButtonName == "Back")
-                                _backPressed = true;
-                            else if (e.ButtonName == "Guide")
-                                _guidePressed = true;
-
-                            // Check for Start+Back combination
-                            bool startBackCombo = Settings.ControllerShortcut == ControllerShortcut.StartBack &&
-                                                 _startPressed && _backPressed;
-
-                            // Check for Guide press
-                            bool guideActivated = Settings.ControllerShortcut == ControllerShortcut.Guide &&
-                                                 _guidePressed;
-
-                            // Process the shortcut if either condition is met
-                            if (startBackCombo || guideActivated)
-                            {
-                                // Use Application.Current.Dispatcher to ensure UI operations happen on the UI thread
-                                System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                                {
-                                    var runningGame = playniteAPI.Database.Games.FirstOrDefault(g => g.IsRunning);
-                                    if (runningGame != null)
-                                    {
-                                        if (overlayWindow.IsVisible)
-                                            overlayWindow.Hide();
-                                        else
-                                            ShowGameOverlay(runningGame);
-                                    }
-                                    else
-                                    {
-                                        ShowPlaynite(true);
-                                    }
-                                }));
-                            }
-                        }
-
-                        // Reset button state on release
-                        if (e.EventType == ControllerEventType.Released)
-                        {
-                            if (e.ButtonName == "Start")
-                                _startPressed = false;
-                            else if (e.ButtonName == "Back")
-                                _backPressed = false;
-                            else if (e.ButtonName == "Guide")
-                                _guidePressed = false;
-                        }
-                    }
-                });
-        }
-
-        // Class-level fields to track button states
-        private bool _startPressed = false;
-        private bool _backPressed = false;
-        private bool _guidePressed = false;
-        #endregion
-
         #region Settings
         public override ISettings GetSettings(bool firstRunSettings)
         {
@@ -678,6 +783,34 @@ namespace PlayniteGameOverlay
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         private const int SW_RESTORE = 9;
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr OpenProcess(ProcessAccessFlags processAccess, bool bInheritHandle, int processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass,
+            ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
+
+        [Flags]
+        private enum ProcessAccessFlags : uint
+        {
+            QueryInformation = 0x00000400
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PROCESS_BASIC_INFORMATION
+        {
+            public IntPtr Reserved1;
+            public IntPtr PebBaseAddress;
+            public IntPtr Reserved2_0;
+            public IntPtr Reserved2_1;
+            public IntPtr UniqueProcessId;
+            public IntPtr InheritedFromUniqueProcessId;
+        }
+
     }
 
     public class AchievementData
@@ -996,5 +1129,126 @@ namespace PlayniteGameOverlay
         Portrait,
         Landscape,
         Square
+    }
+
+    public class ControllerState
+    {
+        public bool ButtonA { get; set; }
+        public bool ButtonB { get; set; }
+        public bool ButtonX { get; set; }
+        public bool ButtonY { get; set; }
+        public bool ButtonStart { get; set; }
+        public bool ButtonBack { get; set; }
+        public bool ButtonLeftBumper { get; set; }
+        public bool ButtonRightBumper { get; set; }
+        public Direction LeftStick { get; set; }
+        public Direction RightStick { get; set; }
+        public bool ButtonDPadUp { get; set; }
+        public bool ButtonDPadDown { get; set; }
+        public bool ButtonDPadLeft { get; set; }
+        public bool ButtonDPadRight { get; set; }
+        public bool ButtonGuide { get; set; } // Xbox Guide button
+        public bool ButtonLeftTrigger { get; set; }
+        public bool ButtonRightTrigger { get; set; }
+
+        public ControllerInput? Update(OnControllerButtonStateChangedArgs args)
+        {
+            if (args == null || args.Button == null)
+            {
+                return null;
+            }
+            var pressed = args.State == ControllerInputState.Pressed;
+            switch (args.Button)
+            {
+                case ControllerInput.A:
+                    ButtonA = pressed;
+                    break;
+                case ControllerInput.B:
+                    ButtonB = pressed;
+                    break;
+                case ControllerInput.X:
+                    ButtonX = pressed;
+                    break;
+                case ControllerInput.Y:
+                    ButtonY = pressed;
+                    break;
+                case ControllerInput.Start:
+                    ButtonStart = pressed;
+                    break;
+                case ControllerInput.Back:
+                    ButtonBack = pressed;
+                    break;
+                case ControllerInput.LeftShoulder:
+                    ButtonLeftBumper = pressed;
+                    break;
+                case ControllerInput.RightShoulder:
+                    ButtonRightBumper = pressed;
+                    break;
+                case ControllerInput.TriggerLeft:
+                    ButtonLeftTrigger = pressed;
+                    break;
+                case ControllerInput.TriggerRight:
+                    ButtonRightTrigger = pressed;
+                    break;
+                case ControllerInput.DPadUp:
+                    ButtonDPadUp = pressed;
+                    break;
+                case ControllerInput.DPadDown:
+                    ButtonDPadDown = pressed;
+                    break;
+                case ControllerInput.DPadLeft:
+                    ButtonDPadLeft = pressed;
+                    break;
+                case ControllerInput.DPadRight:
+                    ButtonDPadRight = pressed;
+                    break;
+                case ControllerInput.Guide:
+                    ButtonGuide = pressed; // Xbox Guide button
+                    break;
+                case ControllerInput.LeftStickRight:
+                    LeftStick = pressed ? Direction.Right : Direction.None;
+                    break;
+                case ControllerInput.LeftStickLeft:
+                    LeftStick = pressed ? Direction.Left : Direction.None;
+                    break;
+                case ControllerInput.LeftStickUp:
+                    LeftStick = pressed ? Direction.Up : Direction.None;
+                    break;
+                case ControllerInput.LeftStickDown:
+                    LeftStick = pressed ? Direction.Down : Direction.None;
+                    break;
+                case ControllerInput.RightStickRight:
+                    RightStick = pressed ? Direction.Right : Direction.None;
+                    break;
+                case ControllerInput.RightStickLeft:
+                    RightStick = pressed ? Direction.Left : Direction.None;
+                    break;
+                case ControllerInput.RightStickUp:
+                    RightStick = pressed ? Direction.Up : Direction.None;
+                    break;
+                case ControllerInput.RightStickDown:
+                    RightStick = pressed ? Direction.Down : Direction.None;
+                    break;
+            }
+
+            if (pressed)
+            {
+                return args.Button;
+            }
+            else
+            {
+                // Return null if the button was released
+                return null;
+            }
+        }
+    }
+
+    public enum Direction
+    {
+        Up,
+        Down,
+        Left,
+        Right,
+        None
     }
 }

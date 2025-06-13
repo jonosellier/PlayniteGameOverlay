@@ -269,8 +269,6 @@ namespace PlayniteGameOverlay
 
         protected override void OnClosed(EventArgs e)
         {
-            ControllerManager.Instance.Dispose();
-
             // Stop timers
             PauseTimers();
 
