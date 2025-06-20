@@ -1,0 +1,28 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+	<sys:String x:Key="OverlaySettings_Title">Configurações da Sobreposição</sys:String>
+	<sys:String x:Key="OverlaySettings_ControllerShortcut">Atalho do Controle</sys:String>
+	<sys:String x:Key="OverlaySettings_GuideControllerShortcut">Para ativação através do botão guia: Desative a detecção do botão guia em outros programas. Verifique as opções da Steam e do Xbox GameBar e no playnite: Desabilite a opção 'Botão guia foca o Playnite'</sys:String>
+	<sys:String x:Key="OverlaySettings_GuideControllerShortcut_kbnote">Nota: O atalho do teclado é Alt + `</sys:String>
+	<sys:String x:Key="OverlaySettings_CoverShape">Formato da Capa</sys:String>
+	<sys:String x:Key="OverlaySettings_EnableDebugMode">Ativar Modo Debug</sys:String>
+	<sys:String x:Key="OverlaySettings_DebugMode_Note">Mostra informações adicionais de debugging na sobreposição. Útil se o jogo não estiver fechando. Também causa a sobreposição a enviar MUITAS logs ao console de debug.</sys:String>
+	<sys:String x:Key="OverlaySettings_Buttons">Botões</sys:String>
+	<sys:String x:Key="OverlaySettings_GuideButtons">Atalhos do teclado devem ser escritos no formato SendKeys. Ctrl é escrito como '^', Shift é '+', e Alt é '%'. Veja mais no</sys:String>
+	<sys:String x:Key="OverlaySettings_DiscordButton">Mostrar Botão do Discord</sys:String>
+	<sys:String x:Key="OverlaySettings_DiscordButtonDesc">Nota: O Discord inicia de forma estranha, então não é possível personalizar.</sys:String>
+	<sys:String x:Key="OverlaySettings_RecordButton">Mostrar Botão de Gravar Gameplay</sys:String>
+	<sys:String x:Key="OverlaySettings_RecentRecordButton">Mostrar Botão de Gravações Recentes</sys:String>
+	<sys:String x:Key="OverlaySettings_StreamingButton">Mostrar Botão de Streaming</sys:String>
+	<sys:String x:Key="OverlaySettings_PerfomanceButton">Mostrar Botão de Sobreposição de Perfomance</sys:String>
+	<sys:String x:Key="OverlaySettings_ScreenshotButton">Mostrar Botão da Galeria de Captura de Telas</sys:String>
+	<sys:String x:Key="OverlaySettings_BrowserButton">Mostrar Botão do Navegador</sys:String>
+	<sys:String x:Key="OverlaySettings_btn_Shortcut">Atalho:</sys:String>
+	<sys:String x:Key="OverlaySettings_btn_Directory">Diretório:</sys:String>
+	<sys:String x:Key="OverlaySettings_btn_BrowserPath">Caminho do Navegador:</sys:String>
+	<sys:String x:Key="Overlay_ReturnToGame">Voltar ao Jogo</sys:String>
+	<sys:String x:Key="Overlay_ShowPlaynite">Mostrar Playnite</sys:String>
+	<sys:String x:Key="Overlay_ExitGame">Sair do Jogo</sys:String>
+</ResourceDictionary>

@@ -21,7 +21,12 @@
         Width="1600">
 
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <ResourceDictionary>
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Localization/pt_BR.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Viewbox Stretch="Uniform">
@@ -43,7 +48,7 @@
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                                 <Path Data="M10,17V14H3V10H10V7L15,12L10,17M10,2H19A2,2 0 0,1 21,4V20A2,2 0 0,1 19,22H10A2,2 0 0,1 8,20V18H10V20H19V4H10V6H8V4A2,2 0 0,1 10,2Z" 
                                       Fill="White" Width="24" Height="24" Stretch="Uniform" Margin="-3,0,18,0"/>
-                                <TextBlock Text="Return to Game" VerticalAlignment="Center"/>
+                                <TextBlock Text="{StaticResource Overlay_ReturnToGame}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button.Content>
                         <Button.Resources>
@@ -83,7 +88,7 @@
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                                 <Path Data="M 53.760 28.496 C 33.560 33.609, 22.270 49.113, 11.485 86.552 C -1.871 132.917, -3.512 171.688, 7.418 182.618 C 16.377 191.577, 28.929 186.235, 46.444 166.008 C 62.325 147.668, 61.688 147.872, 105 147.265 C 154.990 146.565, 161.600 147.871, 172.538 160.607 C 189.871 180.789, 199.516 187.766, 208.662 186.735 C 216.030 185.904, 219.883 181.093, 222.732 169.164 C 224.636 161.195, 225.526 144.474, 224.201 141.570 C 223.682 140.432, 222.519 134.006, 221.617 127.291 C 219.719 113.165, 213.465 87.415, 208.356 72.695 C 199.166 46.216, 187.888 33.071, 170.465 28.533 C 161.863 26.292, 157.859 26.596, 142.413 30.662 C 129.121 34.161, 127.763 34.325, 112 34.345 C 96.501 34.365, 94.772 34.170, 83.500 31.129 C 69.024 27.224, 61.441 26.552, 53.760 28.496 M 157 61.709 C 149.546 64.450, 149.583 75.265, 157.055 77.869 C 164.461 80.451, 171.088 72.939, 167.509 66.018 C 165.420 61.978, 161.094 60.204, 157 61.709 M 37.840 74.887 C 21.794 85.062, 29.010 110, 48 110 C 59.143 110, 67 102.143, 67 91 C 67 79.736, 59.157 72, 47.736 72 C 43.562 72, 41.394 72.632, 37.840 74.887 M 132.923 84.923 C 128.823 89.023, 128.883 93.882, 133.077 97.411 C 136.757 100.507, 140.807 100.727, 144.253 98.016 C 149.230 94.101, 148.515 86.352, 142.909 83.453 C 138.733 81.293, 136.177 81.670, 132.923 84.923 M 174.923 84.923 C 172.928 86.918, 172 88.848, 172 91 C 172 94.937, 176.712 100, 180.376 100 C 189.075 100, 193.099 90.945, 187.077 84.923 C 183.147 80.993, 178.853 80.993, 174.923 84.923 M 153.923 105.923 C 148.967 110.879, 150.248 117.952, 156.580 120.598 C 159.544 121.836, 160.456 121.836, 163.420 120.598 C 169.752 117.952, 171.033 110.879, 166.077 105.923 C 162.147 101.993, 157.853 101.993, 153.923 105.923 M 0.370 153 C 0.370 158.775, 0.535 161.137, 0.737 158.250 C 0.939 155.363, 0.939 150.637, 0.737 147.750 C 0.535 144.863, 0.370 147.225, 0.370 153" 
                                       Fill="White" Width="28" Height="24" Stretch="Uniform" Margin="-2,0,15,0"/>
-                                <TextBlock Text="Show Playnite" VerticalAlignment="Center"/>
+                                <TextBlock Text="{StaticResource Overlay_ShowPlaynite}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button.Content>
                         <Button.Resources>
@@ -148,7 +153,7 @@
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                             <Path Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" 
                                 Fill="White" Width="20" Height="20" Stretch="Uniform" Margin="2,0,17,0"/>
-                            <TextBlock Text="Exit Game" VerticalAlignment="Center"/>
+                            <TextBlock Text="{StaticResource Overlay_ExitGame}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
