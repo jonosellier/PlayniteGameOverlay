@@ -358,8 +358,8 @@ namespace PlayniteGameOverlay
                 string[] gameNameWords = gameName.ToLower().Split(new char[] { ' ', '-', '_', ':', '.', '(', ')', '[', ']' },
                     StringSplitOptions.RemoveEmptyEntries);
 
-                logger.Debug($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
-                logger.Debug($"Process tree contains {processTree.Count} processes");
+                Debug.WriteLine($"Game name for matching: {gameName}, split into {gameNameWords.Length} words");
+                Debug.WriteLine($"Process tree contains {processTree.Count} processes");
 
                 // Filter process tree to only include processes with main windows and sufficient memory
                 var candidateProcesses = processTree.Where(p =>
@@ -377,7 +377,7 @@ namespace PlayniteGameOverlay
                     }
                 }).ToList();
 
-                logger.Debug($"Found {candidateProcesses.Count} candidate processes in tree");
+                Debug.WriteLine($"Found {candidateProcesses.Count} candidate processes in tree");
 
                 var candidates = new List<Process>();
                 var nameMatchCandidates = new List<Process>();
@@ -450,7 +450,7 @@ namespace PlayniteGameOverlay
 
             if (rootPid == null || rootPid <= 0)
             {
-                logger.Debug("No root PID provided, using all processes with main windows");
+                Debug.WriteLine("No root PID provided, using all processes with main windows");
                 // Fallback to all processes with main windows if no PID provided
                 return Process.GetProcesses()
                     .Where(p =>
@@ -474,7 +474,7 @@ namespace PlayniteGameOverlay
                 if (rootProcess != null && !rootProcess.HasExited)
                 {
                     processTree.Add(rootProcess);
-                    logger.Debug($"Added root process: {rootProcess.ProcessName} (ID: {rootProcess.Id})");
+                    Debug.WriteLine($"Added root process: {rootProcess.ProcessName} (ID: {rootProcess.Id})");
                 }
             }
             catch (Exception ex)
@@ -489,7 +489,7 @@ namespace PlayniteGameOverlay
 
             processTree.AddRange(childProcesses);
 
-            logger.Debug($"Process tree built with {processTree.Count} total processes");
+            Debug.WriteLine($"Process tree built with {processTree.Count} total processes");
             return processTree;
         }
 
@@ -507,7 +507,7 @@ namespace PlayniteGameOverlay
                         if (!process.HasExited && GetParentProcessId(process.Id) == parentId)
                         {
                             children.Add(process);
-                            logger.Debug($"Added child process: {process.ProcessName} (ID: {process.Id})");
+                            Debug.WriteLine($"Added child process: {process.ProcessName} (ID: {process.Id})");
 
                             // Recursively get grandchildren
                             children.AddRange(GetChildProcesses(process.Id, processesById));
@@ -515,13 +515,13 @@ namespace PlayniteGameOverlay
                     }
                     catch (Exception ex)
                     {
-                        logger.Debug($"Error checking process {process.Id}: {ex.Message}");
+                        Debug.WriteLine($"Error checking process {process.Id}: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                logger.Debug($"Error getting child processes for PID {parentId}: {ex.Message}");
+                Debug.WriteLine($"Error getting child processes for PID {parentId}: {ex.Message}");
             }
 
             return children;
@@ -551,7 +551,7 @@ namespace PlayniteGameOverlay
             }
             catch (Exception ex)
             {
-                logger.Debug($"Error getting parent PID for process {processId}: {ex.Message}");
+                Debug.WriteLine($"Error getting parent PID for process {processId}: {ex.Message}");
             }
 
             return -1;
@@ -578,7 +578,7 @@ namespace PlayniteGameOverlay
                 }
                 gameExecutables.AddRange(additionalNames);
 
-                logger.Debug($"Found {gameExecutables.Count} potential game executables in {game.InstallDirectory}");
+                Debug.WriteLine($"Found {gameExecutables.Count} potential game executables in {game.InstallDirectory}");
             }
             catch (Exception ex)
             {
@@ -611,7 +611,15 @@ namespace PlayniteGameOverlay
             if (candidates.Count > 0)
             {
                 var bestMatch = candidates.OrderByDescending(p => p.WorkingSet64).First();
-                logger.Debug($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                Debug.WriteLine($"Found process with matching path: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                return bestMatch;
+            }
+
+
+            if (nameMatchCandidates.Count > 0)
+            {
+                var bestMatch = nameMatchCandidates.OrderByDescending(p => p.WorkingSet64).First();
+                Debug.WriteLine($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
                 return bestMatch;
             }
 
@@ -620,14 +628,7 @@ namespace PlayniteGameOverlay
                 var bestMatch = titleMatchCandidates.OrderByDescending(t => t.MatchCount)
                                                     .ThenByDescending(t => t.Process.WorkingSet64)
                                                     .First().Process;
-                logger.Debug($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
-                return bestMatch;
-            }
-
-            if (nameMatchCandidates.Count > 0)
-            {
-                var bestMatch = nameMatchCandidates.OrderByDescending(p => p.WorkingSet64).First();
-                logger.Debug($"Found process with matching name: {bestMatch.ProcessName} (ID: {bestMatch.Id})");
+                Debug.WriteLine($"Found process with matching window title: {bestMatch.ProcessName} (ID: {bestMatch.Id}, Title: {bestMatch.MainWindowTitle})");
                 return bestMatch;
             }
 
@@ -636,7 +637,7 @@ namespace PlayniteGameOverlay
                 var processFromPlaynite = inaccessibleCandidates.FirstOrDefault(p => p.Id == originalPid);
                 if (processFromPlaynite != null)
                 {
-                    logger.Debug($"Found original process in tree: {processFromPlaynite.ProcessName} (ID: {processFromPlaynite.Id})");
+                    Debug.WriteLine($"Found original process in tree: {processFromPlaynite.ProcessName} (ID: {processFromPlaynite.Id})");
                     return processFromPlaynite;
                 }
             }
@@ -867,6 +868,7 @@ namespace PlayniteGameOverlay
 
         // Using properties with setters that notify of changes
         private ControllerShortcut _controllerShortcut = ControllerShortcut.StartBack;
+        private CloseBehavior _closeBehavior = CloseBehavior.CloseAndEnd;
         private bool _debugMode = false;
         private AspectRatio _aspectRatio = AspectRatio.Portrait;
 
@@ -892,6 +894,12 @@ namespace PlayniteGameOverlay
         {
             get => _controllerShortcut;
             set => SetValue(ref _controllerShortcut, value);
+        }
+
+        public CloseBehavior CloseBehavior
+        {
+            get => _closeBehavior;
+            set => SetValue(ref _closeBehavior, value);
         }
 
         public bool DebugMode
@@ -994,6 +1002,7 @@ namespace PlayniteGameOverlay
 
         // Backup values for cancel operation
         private ControllerShortcut _controllerShortcutBackup;
+        private CloseBehavior _closeBehaviorBackup;
         private bool _debugModeBackup;
         private bool _showRecordGameplayBackup;
         private bool _showRecordRecentBackup;
@@ -1026,6 +1035,8 @@ namespace PlayniteGameOverlay
             {
                 if (savedSettings.ControllerShortcut != null)
                     ControllerShortcut = savedSettings.ControllerShortcut;
+                if (savedSettings.CloseBehavior != null)
+                    CloseBehavior = savedSettings.CloseBehavior;
                 if (savedSettings.DebugMode != null)
                     DebugMode = savedSettings.DebugMode;
                 if (savedSettings.AspectRatio != null)
@@ -1056,6 +1067,7 @@ namespace PlayniteGameOverlay
             // Backup current values in case user cancels
             _controllerShortcutBackup = ControllerShortcut;
             _debugModeBackup = DebugMode;
+            _closeBehaviorBackup = CloseBehavior;
 
             // Backup toggle values
             _showRecordGameplayBackup = ShowRecordGameplay;
@@ -1081,6 +1093,7 @@ namespace PlayniteGameOverlay
             // Restore from backup
             ControllerShortcut = _controllerShortcutBackup;
             DebugMode = _debugModeBackup;
+            CloseBehavior = _closeBehaviorBackup;
 
             // Restore toggle backups
             ShowRecordGameplay = _showRecordGameplayBackup;
@@ -1115,13 +1128,30 @@ namespace PlayniteGameOverlay
             return true;
         }
     }
+
     public enum ControllerShortcut
     {
         [Description("View + Menu (Back + Start)")]
         StartBack,
 
         [Description("Xbox Button (Guide Button)")]
-        Guide
+        Guide,
+
+        [Description("None (Disabled)")]
+        None
+    }
+
+
+    public enum CloseBehavior
+    {
+        [Description("Close Window (asking)")]
+        CloseWindow,
+
+        [Description("End Task (telling)")]
+        EndTask,
+
+        [Description("Close then End Task")]
+        CloseAndEnd
     }
 
     public enum AspectRatio

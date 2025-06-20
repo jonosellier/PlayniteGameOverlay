@@ -37,6 +37,18 @@ namespace PlayniteGameOverlay
             }
         }
 
+        private CloseBehavior _closeBehavior;
+
+        public CloseBehavior CloseBehavior
+        {
+            get => _closeBehavior;
+            set
+            {
+                _closeBehavior = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CloseBehavior)));
+            }
+        }
+
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {

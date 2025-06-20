@@ -7,10 +7,17 @@
 
     <UserControl.Resources>
         <ObjectDataProvider x:Key="ControllerShortcutEnum" 
-                            MethodName="GetValues" 
-                            ObjectType="{x:Type System:Enum}">
+                    MethodName="GetValues" 
+                    ObjectType="{x:Type System:Enum}">
             <ObjectDataProvider.MethodParameters>
                 <x:Type TypeName="local:ControllerShortcut"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+        <ObjectDataProvider x:Key="CloseBehaviorEnum" 
+                    MethodName="GetValues" 
+                    ObjectType="{x:Type System:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="local:CloseBehavior"/>
             </ObjectDataProvider.MethodParameters>
         </ObjectDataProvider>
         <ObjectDataProvider x:Key="AspectRatioEnum" 
@@ -46,6 +53,25 @@
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
+
+            <TextBlock Text="Close Game Behavior:" 
+         Margin="0,0,0,5"/>
+            <ComboBox ItemsSource="{Binding Source={StaticResource CloseBehaviorEnum}}"
+                SelectedItem="{Binding CloseBehavior}"
+                Width="270"
+                HorizontalAlignment="Left"
+                Margin="0,0,0,15">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock>
+                            <TextBlock.Text>
+                                <Binding Path="." Converter="{StaticResource EnumDescriptionConverter}" />
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
             <TextBlock Text="Note for using Guide Button for controller activation: Ensure you disable Guide Button detection in all other programs. Check Steam and Xbox GameBar settings and inside playnite, disable 'Show Playnite When Guide Button is Pressed'" TextWrapping="Wrap"
            Margin="0,0,0,20" Foreground="#888888" />
             <TextBlock Text="Note: The keyboard shortcut is Alt + Backtick" 
