@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace PlayniteGameOverlay
 {
@@ -43,16 +44,51 @@ namespace PlayniteGameOverlay
             }
         }
 
-        public void CloseGame(GameOverlayData gameData)
+        public async void CloseGame(GameOverlayData gameData, CloseBehavior behavior = CloseBehavior.CloseAndEnd)
         {
             if (gameData != null)
             {
                 var proc = FindProcessById(gameData.ProcessId);
-                if (proc != null)
+                if (proc == null)
                 {
-                    proc.CloseMainWindow();
-                    proc.Close();
+                    return;
                 }
+
+                var success = proc.CloseMainWindow();
+                switch (behavior)
+                {
+                    case CloseBehavior.CloseAndEnd:
+                        if (!success)
+                        {
+                            proc.Kill(); // Forcefully kill the process if closing the main window fails
+                        }
+                        for (int i = 0; i < 30 && !proc.HasExited; i++)
+                        {
+                            await Task.Delay(100); // Wait for up to 3 seconds for the process to exit gracefully
+                        }
+                        if (!proc.HasExited)
+                        {
+                            _logger.Log($"Process {proc.ProcessName} did not exit gracefully after 3 seconds, killing it forcefully.", "WARNING");
+                            proc.Kill(); // Forcefully kill the process if it hasn't exited
+                        }
+                        proc.Close();
+                        break;
+                    case CloseBehavior.CloseWindow:
+                        if (!success)
+                        {
+                            proc.Kill(); // Forcefully kill the process if closing the main window fails
+                        }
+                        proc.Close();
+                        break;
+                    case CloseBehavior.EndTask:
+                        proc.Kill(); // Forcefully kill the process regardless
+                        proc.Close();
+                        break;
+                    default:
+                        _logger.Log($"Unknown close behavior: {behavior}", "ERROR");
+                        break;
+                }
+
             }
         }
 
