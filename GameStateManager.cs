@@ -62,13 +62,13 @@ namespace PlayniteGameOverlay
                         {
                             proc.Kill(); // Forcefully kill the process if closing the main window fails
                         }
-                        for (int i = 0; i < 100 && !proc.HasExited; i++)
+                        for (int i = 0; i < 30 && !proc.HasExited; i++)
                         {
-                            await Task.Delay(100); // Wait for up to 10 seconds for the process to exit gracefully
+                            await Task.Delay(100); // Wait for up to 3 seconds for the process to exit gracefully
                         }
                         if (!proc.HasExited)
                         {
-                            _logger.Log($"Process {proc.ProcessName} did not exit gracefully after 10 seconds, killing it forcefully.", "WARNING");
+                            _logger.Log($"Process {proc.ProcessName} did not exit gracefully after 3 seconds, killing it forcefully.", "WARNING");
                             proc.Kill(); // Forcefully kill the process if it hasn't exited
                         }
                         proc.Close();
