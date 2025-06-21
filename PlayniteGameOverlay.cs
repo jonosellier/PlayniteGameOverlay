@@ -1043,22 +1043,62 @@ namespace PlayniteGameOverlay
                     AspectRatio = savedSettings.AspectRatio;
 
                 // Load toggle settings
-                if (savedSettings.ShowRecordGameplay != null) ShowRecordGameplay = savedSettings.ShowRecordGameplay;
-                if (savedSettings.ShowRecordRecent != null) ShowRecordRecent = savedSettings.ShowRecordRecent;
-                if (savedSettings.ShowStreaming != null) ShowStreaming = savedSettings.ShowStreaming;
-                if (savedSettings.ShowPerformanceOverlay != null) ShowPerformanceOverlay = savedSettings.ShowPerformanceOverlay;
-                if (savedSettings.ShowScreenshotGallery != null) ShowScreenshotGallery = savedSettings.ShowScreenshotGallery;
-                if (savedSettings.ShowWebBrowser != null) ShowWebBrowser = savedSettings.ShowWebBrowser;
-                if (savedSettings.ShowDiscord != null) ShowDiscord = savedSettings.ShowDiscord;
+                if (savedSettings.ShowRecordGameplay != null && savedSettings.RecordGameplayShortcut != null)
+                {
+                    ShowRecordGameplay = savedSettings.ShowRecordGameplay;
+                    RecordGameplayShortcut = savedSettings.RecordGameplayShortcut;
+                }
+                else
+                {
+                    ShowRecordGameplay = false;
+                }
+                if (savedSettings.ShowRecordRecent != null && savedSettings.RecordRecentShortcut != null)
+                {
+                    ShowRecordRecent = savedSettings.ShowRecordRecent;
+                    RecordRecentShortcut = savedSettings.RecordRecentShortcut;
+                }
+                else
+                {
+                    ShowRecordRecent = false;
+                }
+                if (savedSettings.ShowStreaming != null && savedSettings.StreamingShortcut != null)
+                {
+                    ShowStreaming = savedSettings.ShowStreaming;
+                    StreamingShortcut = savedSettings.StreamingShortcut;
+                }
+                else
+                {
+                    ShowStreaming = false;
+                }
+                if (savedSettings.ShowPerformanceOverlay != null && savedSettings.PerformanceOverlayShortcut != null)
+                {
+                    ShowPerformanceOverlay = savedSettings.ShowPerformanceOverlay;
+                    PerformanceOverlayShortcut = savedSettings.PerformanceOverlayShortcut;
+                }
+                else
+                {
+                    ShowPerformanceOverlay = false;
+                }
+                if (savedSettings.ShowScreenshotGallery != null && savedSettings.ScreenshotGalleryPath != null)
+                {
+                    ShowScreenshotGallery = savedSettings.ShowScreenshotGallery;
+                    ScreenshotGalleryPath = savedSettings.ScreenshotGalleryPath;
+                }
+                else
+                {
+                    ShowScreenshotGallery = false;
+                }
+                if (savedSettings.ShowWebBrowser != null && savedSettings.WebBrowserPath != null)
+                {
+                    ShowWebBrowser = savedSettings.ShowWebBrowser;
+                    WebBrowserPath = savedSettings.WebBrowserPath;
+                }
+                else
+                {
+                    ShowWebBrowser = false;
+                }
                 if (savedSettings.ShowBattery != null) ShowBattery = savedSettings.ShowBattery;
-
-                // Load shortcut and path settings
-                if (savedSettings.RecordGameplayShortcut != null) RecordGameplayShortcut = savedSettings.RecordGameplayShortcut;
-                if (savedSettings.RecordRecentShortcut != null) RecordRecentShortcut = savedSettings.RecordRecentShortcut;
-                if (savedSettings.StreamingShortcut != null) StreamingShortcut = savedSettings.StreamingShortcut;
-                if (savedSettings.PerformanceOverlayShortcut != null) PerformanceOverlayShortcut = savedSettings.PerformanceOverlayShortcut;
-                if (savedSettings.ScreenshotGalleryPath != null) ScreenshotGalleryPath = savedSettings.ScreenshotGalleryPath;
-                if (savedSettings.WebBrowserPath != null) WebBrowserPath = savedSettings.WebBrowserPath;
+                if (savedSettings.ShowDiscord != null) ShowDiscord = savedSettings.ShowDiscord;
             }
         }
 
