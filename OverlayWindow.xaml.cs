@@ -87,6 +87,7 @@ namespace PlayniteGameOverlay
 
             // Initialize buttons and setup from settings
             ViewModel.DebugVisible = settings?.DebugMode ?? false;
+            ViewModel.AspectRatio = settings?.AspectRatio ?? AspectRatio.Portrait;
             ViewModel.InitializeShortcutButtons(settings);
         }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
@@ -33,6 +34,71 @@ namespace PlayniteGameOverlay
         private bool _hasBattery;
 
         public bool ShowShortcutButtons => ShortcutButtons.Count > 0;
+
+        private AspectRatio _aspectRatio = AspectRatio.Portrait;
+        public AspectRatio AspectRatio
+        {
+            get => _aspectRatio;
+            set
+            {
+                _aspectRatio = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CoverWidth));
+                OnPropertyChanged(nameof(CoverHeight));
+                OnPropertyChanged(nameof(InnerRect));
+            }
+        }
+
+        public int CoverWidth
+        {
+            get
+            {
+                switch (AspectRatio)
+                {
+                    case AspectRatio.Portrait:
+                        return 375;
+                    case AspectRatio.Landscape:
+                        return 550;
+                    case AspectRatio.Square:
+                        return 425;
+                }
+                return 375; // Default to Portrait if not set
+            }
+        }
+
+        public int CoverHeight
+        {
+            get
+            {
+                switch (AspectRatio)
+                {
+                    case AspectRatio.Portrait:
+                        return 525;
+                    case AspectRatio.Landscape:
+                        return 262;
+                    case AspectRatio.Square:
+                        return 425;
+                }
+                return 525; // Default to Portrait if not set
+            }
+        }
+
+        public Rect InnerRect
+        {
+            get
+            {
+                switch (AspectRatio)
+                {
+                    case AspectRatio.Portrait:
+                        return new Rect(0, 0, 371, 521);
+                    case AspectRatio.Landscape:
+                        return new Rect(0, 0, 546, 258);
+                    case AspectRatio.Square:
+                        return new Rect(0, 0, 421, 421);
+                }
+                return new Rect(0, 0, 373, 523); // Default to Portrait if not set
+            }
+        }
 
         public string GameTitle
         {

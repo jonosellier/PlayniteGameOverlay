@@ -157,13 +157,35 @@
             <!-- Content container -->
             <TextBlock x:Name="GameTitle" Text="{Binding GameTitle}" Foreground="White" FontWeight="Bold" HorizontalAlignment="Left" 
                            Margin="36,4,0,0" Height="56" VerticalAlignment="Top" FontSize="36" Width="1309"/>
-            <Border x:Name="OuterImgBorder" BorderBrush="#80808080" BorderThickness="1,1,1,1" Width="377" Height="527" Margin="0,120,36,0" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="8,8,8,8" Background="#80808080">
-                <Border x:Name="InnerImgBorder" BorderBrush="#80808080" BorderThickness="0,0,0,0" Width="375" Height="525" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="7,7,7,7" Margin="0,0,0,0">
+            <Border x:Name="OuterImgBorder" 
+        BorderBrush="#80808080" 
+        BorderThickness="1,1,1,1" 
+        Width="{Binding CoverWidth}" 
+        Height="{Binding CoverHeight}" 
+        Margin="0,120,36,0" 
+        HorizontalAlignment="Right" 
+        VerticalAlignment="Top" 
+        CornerRadius="8,8,8,8" 
+        Background="#80808080">
+                <Border x:Name="InnerImgBorder" 
+            BorderBrush="#80808080" 
+            BorderThickness="0,0,0,0" 
+            HorizontalAlignment="Left" 
+            VerticalAlignment="Top" 
+            CornerRadius="7,7,7,7" 
+            Margin="1,1,1,1">
                     <Border.Clip>
-                        <RectangleGeometry RadiusX="7" RadiusY="7" Rect="0,0,375,525" x:Name="ImgBorderClip"/>
+                        <RectangleGeometry RadiusX="7" RadiusY="7" x:Name="ImgBorderClip">
+                            <RectangleGeometry.Rect>
+                                <Binding Path="InnerRect" />
+                            </RectangleGeometry.Rect>
+                        </RectangleGeometry>
                     </Border.Clip>
-                    <Image x:Name="GameCoverImage" Source="{Binding CoverImagePath}"
-                           Stretch="UniformToFill" Width="375" Height="525" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Image x:Name="GameCoverImage" 
+               Source="{Binding CoverImagePath}"
+               Stretch="UniformToFill" 
+               VerticalAlignment="Center" 
+               HorizontalAlignment="Center"/>
                 </Border>
             </Border>
             <!-- Clock -->
