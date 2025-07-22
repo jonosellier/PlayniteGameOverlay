@@ -56,3 +56,9 @@ Packages:
     Changelog:
       - Add close-game settings
       - Only display bottom bar icons if the correct bindings are set
+  - Version: 0.4.5
+    RequiredApiVersion: 6.12.0.0
+    ReleaseDate: 2025-07-21
+    PackageUrl: https://github.com/jonosellier/PlayniteGameOverlay/releases/download/v0.4.5/PlayniteGameOverlay_fc75626e-ec69-4287-972a-b86298555ebb_0_4_5.pext
+    Changelog:
+      - Fixed Cover art aspect ratio settings not being reflected in the UI (Thanks OddEyes!)
