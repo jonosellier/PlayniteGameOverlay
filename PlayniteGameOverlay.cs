@@ -106,7 +106,7 @@ namespace PlayniteGameOverlay
                             break;
                         case ControllerInput.B:
                             log("Button B pressed - Hiding overlay", "SDL_NAV");
-                            overlayWindow.Hide();
+                            overlayWindow.AudioBackOrHide();
                             break;
                     }
                 }

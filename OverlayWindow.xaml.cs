@@ -32,6 +32,7 @@ namespace PlayniteGameOverlay
         public OverlayWindow(OverlaySettings settings)
         {
             InitializeComponent();
+            InitializeAudioSelection();
 
             Settings = settings;
 
