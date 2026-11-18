@@ -16,6 +16,7 @@
         ResizeMode="NoResize"
         WindowState="Maximized"
         ShowInTaskbar="False" 
+        Title="Playnite Overlay"
         av:DesignHeight="900" 
         av:DesignWidth="1600" 
         Width="1600">
@@ -35,7 +36,7 @@
                 Width="300" Height="Auto" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="38,120,0,0" BorderBrush="#80808080" BorderThickness="1,1,1,1">
                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" Width="260">
                     <!-- Windows 11 style buttons with icons -->
-                    <Button x:Name="ReturnToGameButton" Height="70" Width="260" 
+                    <Button x:Name="ReturnToGameButton" Height="70" Width="260" AutomationProperties.Name="Return to Game"
                         Foreground="White" FontSize="20" FontWeight="SemiBold"
                         BorderThickness="0" Padding="20,10" Margin="0,0,0,20"
                         Command="{Binding ReturnToGameCommand}">
@@ -75,7 +76,7 @@
                         </Button.Style>
                     </Button>
 
-                    <Button x:Name="ShowPlayniteButton" Height="70" Width="260" 
+                    <Button x:Name="ShowPlayniteButton" Height="70" Width="260" AutomationProperties.Name="Show Playnite"
                         Foreground="White" FontSize="20" FontWeight="SemiBold"
                         BorderThickness="0" Padding="20,10" Margin="0,0,0,20"
                         Command="{Binding ShowPlayniteCommand}">
@@ -114,7 +115,7 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button x:Name="CloseGameButton" Height="70" Width="260" 
+                    <Button x:Name="CloseGameButton" Height="70" Width="260" AutomationProperties.Name="Exit Game"
                         Foreground="White" FontSize="20" FontWeight="SemiBold"
                         BorderThickness="0" Padding="20,10"
                         Command="{Binding CloseGameCommand}">
@@ -303,7 +304,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Button Width="60" Height="60" Margin="4" 
+                            <Button Width="60" Height="60" Margin="4" AutomationProperties.Name="{Binding Title}"
                                     Command="{Binding DataContext.ShortcutButtonCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     CommandParameter="{Binding}"
                                     >
