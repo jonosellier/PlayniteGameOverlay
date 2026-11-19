@@ -229,6 +229,8 @@
     <Compile Include="ButtonActions.cs" />
     <Compile Include="ButtonItem.cs" />
     <Compile Include="GameStateManager.cs" />
+    <Compile Include="AudioSelection.cs" />
+    <Compile Include="AudioOutputService.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="GlobalKeyboardHook.cs" />
     <Compile Include="OverlaySettingsView.xaml.cs">
